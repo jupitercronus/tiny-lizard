@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Movie - tiny lizard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -388,8 +389,13 @@
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
 
     <script>
+        // Initialize Supabase Client
+        const SUPABASE_URL = 'https://xzxvnrrowfsuhragsxki.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6eHZucnJvd2ZzdWhyYWdzeGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MjI0NTUsImV4cCI6MjA2OTI5ODQ1NX0.7FhXHQn8wkClZTlvEoVxphzohjqI_vGuG1feT_fpn6o';
+        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // Global variables
-        let movies = JSON.parse(localStorage.getItem('tinyLizardMovies')) || [];
+        let movies = []; 
         let currentRating = 0;
         let editingMovieId = null; 
         
@@ -421,12 +427,12 @@
         // --- End Modal Functions ---
 
         // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() { 
             setupStarRating();
             setupForm();
             setupSearch();
             setupBarcodeScanner();
-            checkEditMode(); 
+            await checkEditMode(); 
         });
 
         // Barcode scanner functionality
@@ -558,7 +564,6 @@
             document.getElementById('barcodeResult').innerHTML = ''; 
         }
 
-        // Add a CORS proxy for UPC Item DB calls
         const CORS_PROXY_URL = 'https://cors-anywhere.herokuapp.com/'; 
 
         async function lookupMovieByBarcode(barcode) {
@@ -659,33 +664,16 @@
         function extractMovieTitle(productName) {
             let title = productName;
             
-            // Remove common DVD/Blu-ray/format terms more robustly
             title = title.replace(/\b(DVD|Blu-ray|Blu ray|BD|4K|UHD|Digital|Copy|Widescreen|Full Screen|Anamorphic|Disc|Set|Collection)\b/gi, '');
-            
-            // Remove edition information and common metadata in parentheses/brackets
-            // This is the most crucial part for "Burn After Reading (Spotlight Series) ("
-            title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); // Removes (anything in parentheses)
-            title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim(); // Removes [anything in brackets]
-            
-            // Remove other common edition/series terms if they are not in parentheses
+            title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); 
+            title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim(); 
             title = title.replace(/\b(Special Edition|Director's Cut|Extended|Unrated|Collector's Edition|Limited Edition|Criterion|Series|Spotlight)\b/gi, '');
-
-            // Remove years that might sneak in if not in parentheses
             title = title.replace(/\s*\d{4}\s*/g, ' ').trim();
-
-            // Remove common punctuation/symbols that might interfere with search
             title = title.replace(/[™®©!@#$%^&*()_+={}\[\]:;"'<>,.?/~`|\\-]/g, ' ').trim();
-
-            // Remove extra whitespace (multiple spaces to single space)
             title = title.replace(/\s+/g, ' ').trim();
-            
-            // Remove leading/trailing dashes or brackets (again, after other cleaning)
             title = title.replace(/^[-\[\(]+|[-\]\)]+$/g, '').trim();
-
-            // Final trim just in case
             title = title.trim();
             
-            // Fallback to original if cleaning resulted in empty string
             return title || productName; 
         }
 
@@ -722,7 +710,7 @@
             });
         }
 
-        function addMovie() {
+        async function addMovie() { 
             const title = document.getElementById('title').value.trim();
             
             if (!title) {
@@ -730,27 +718,37 @@
                 return;
             }
 
-            const movie = {
-                id: Date.now(), 
+            const newMovie = {
                 title: title,
-                year: document.getElementById('year').value || '',
-                director: document.getElementById('director').value.trim() || '',
-                genre: document.getElementById('genre').value.trim() || '',
-                rating: currentRating,
+                year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null, 
+                director: document.getElementById('director').value.trim() || null, 
+                genre: document.getElementById('genre').value.trim() || null,
+                rating: currentRating || 0, 
                 watched: document.getElementById('watched').value === 'true',
-                runtime: document.getElementById('runtime').value || '',
-                review: document.getElementById('review').value.trim() || '',
-                posterUrl: document.getElementById('movieForm').dataset.posterUrl || '',
-                dateAdded: new Date().toLocaleDateString()
+                runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null, 
+                review: document.getElementById('review').value.trim() || null,
+                posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
+                dateAdded: new Date().toISOString() 
             };
 
-            movies.push(movie);
-            localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
-            
-            showAlertModal('Success', 'Movie added successfully!', clearForm);
+            const { data, error } = await supabase
+                .from('movies')
+                .insert([newMovie])
+                .select(); // Add .select() to return the inserted data (including the generated UUID)
+
+            if (error) {
+                console.error('Error adding movie:', error);
+                showAlertModal('Error', 'Failed to add movie to database. Check console for details.');
+            } else {
+                console.log('Movie added successfully:', data);
+                showAlertModal('Success', 'Movie added successfully!', () => {
+                    clearForm();
+                    window.location.href = 'index.html'; 
+                });
+            }
         }
 
-        function updateMovie() {
+        async function updateMovie() { 
             const title = document.getElementById('title').value.trim();
             
             if (!title) {
@@ -758,26 +756,31 @@
                 return;
             }
 
-            const movieIndex = movies.findIndex(m => m.id === editingMovieId);
+            const updatedMovie = {
+                title: title,
+                year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null,
+                director: document.getElementById('director').value.trim() || null,
+                genre: document.getElementById('genre').value.trim() || null,
+                rating: currentRating || 0,
+                watched: document.getElementById('watched').value === 'true',
+                runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null,
+                review: document.getElementById('review').value.trim() || null,
+                posterUrl: document.getElementById('movieForm').dataset.posterUrl || null, 
+            };
 
-            if (movieIndex > -1) {
-                movies[movieIndex].title = title;
-                movies[movieIndex].year = document.getElementById('year').value || '';
-                movies[movieIndex].director = document.getElementById('director').value.trim() || '';
-                movies[movieIndex].genre = document.getElementById('genre').value.trim() || '';
-                movies[movieIndex].rating = currentRating;
-                movies[movieIndex].watched = document.getElementById('watched').value === 'true';
-                movies[movieIndex].runtime = document.getElementById('runtime').value || '';
-                movies[movieIndex].review = document.getElementById('review').value.trim() || '';
-                movies[movieIndex].posterUrl = document.getElementById('movieForm').dataset.posterUrl || movies[movieIndex].posterUrl || ''; 
-                
-                localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
-                
+            const { data, error } = await supabase
+                .from('movies')
+                .update(updatedMovie) 
+                .eq('id', editingMovieId); 
+
+            if (error) {
+                console.error('Error updating movie:', error);
+                showAlertModal('Error', 'Failed to update movie in database. Check console for details.');
+            } else {
+                console.log('Movie updated successfully:', data);
                 showAlertModal('Success', 'Movie updated successfully!', () => {
                     window.location.href = 'index.html'; 
                 });
-            } else {
-                showAlertModal('Error', 'Movie not found for update.');
             }
         }
 
@@ -792,29 +795,40 @@
             document.getElementById('barcodeResult').innerHTML = ''; 
         }
 
-        function checkEditMode() {
+        async function checkEditMode() { 
             const urlParams = new URLSearchParams(window.location.search);
             const movieId = urlParams.get('edit');
 
             if (movieId) {
-                editingMovieId = parseInt(movieId);
-                const movieToEdit = movies.find(m => m.id === editingMovieId);
+                editingMovieId = movieId; 
+                document.getElementById('formTitle').textContent = 'Loading Movie for Edit...';
 
-                if (movieToEdit) {
+                const { data, error } = await supabase
+                    .from('movies')
+                    .select('*')
+                    .eq('id', movieId) 
+                    .single(); 
+
+                if (error) {
+                    console.error('Error fetching movie for edit:', error);
+                    showAlertModal('Error', 'Failed to load movie for editing. Starting a new entry.');
+                    clearForm(); 
+                } else if (data) {
+                    const movieToEdit = data;
                     document.getElementById('formTitle').textContent = 'Edit Movie';
                     document.getElementById('submitBtn').textContent = 'Update Movie';
 
                     document.getElementById('title').value = movieToEdit.title;
-                    document.getElementById('year').value = movieToEdit.year;
-                    document.getElementById('director').value = movieToEdit.director;
-                    document.getElementById('genre').value = movieToEdit.genre;
+                    document.getElementById('year').value = movieToEdit.year || '';
+                    document.getElementById('director').value = movieToEdit.director || '';
+                    document.getElementById('genre').value = movieToEdit.genre || '';
                     
-                    currentRating = movieToEdit.rating;
+                    currentRating = movieToEdit.rating || 0;
                     updateStars();
                     
                     document.getElementById('watched').value = movieToEdit.watched ? 'true' : 'false';
-                    document.getElementById('runtime').value = movieToEdit.runtime;
-                    document.getElementById('review').value = movieToEdit.review;
+                    document.getElementById('runtime').value = movieToEdit.runtime || '';
+                    document.getElementById('review').value = movieToEdit.review || '';
                     
                     if (movieToEdit.posterUrl) {
                         document.getElementById('movieForm').dataset.posterUrl = movieToEdit.posterUrl;
@@ -822,8 +836,8 @@
                         document.getElementById('movieForm').removeAttribute('data-poster-url');
                     }
                 } else {
-                    showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
-                    clearForm(); 
+                     showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
+                     clearForm();
                 }
             }
         }
@@ -860,7 +874,7 @@
                     throw new Error('Search failed');
                 }
                 
-                const data = response.json();
+                const data = await response.json(); 
                 displayResults(data.results);
                 
             } catch (error) {
