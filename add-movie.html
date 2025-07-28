@@ -306,7 +306,7 @@
             <div class="scanner-container" id="scannerContainer">
                 <div class="scanner-overlay">
                     <video id="video" autoplay></video>
-                    <div class="scan-line"></div>
+                    <div class="scan-line"></div> 
                 </div>
                 <button type="button" id="stopScanBtn" class="btn" style="margin-top: 10px;">Stop Camera</button>
             </div>
@@ -385,27 +385,34 @@
         </div>
     </div>
 
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
+
     <script>
         // Global variables
         let movies = JSON.parse(localStorage.getItem('tinyLizardMovies')) || [];
         let currentRating = 0;
-        let editingMovieId = null; // To store the ID of the movie being edited
+        let editingMovieId = null; 
         
         // TMDb API configuration
         const TMDB_API_KEY = '3b3635a90ec6594d6682856b6669d20d';
         const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
         const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
+        // --- ZXing-JS specific variables ---
+        let codeReader = null;
+        let videoInputDevices = [];
+        // --- End ZXing-JS specific variables ---
+
         // --- Modal Functions ---
         function showAlertModal(title, message, onOk = () => {}) {
             const modal = document.getElementById('alertModal');
             document.getElementById('alertModalTitle').textContent = title;
             document.getElementById('alertModalMessage').textContent = message;
-            modal.style.display = 'flex'; // Use flex to center content
+            modal.style.display = 'flex'; 
 
             const okBtn = document.getElementById('alertModalOk');
 
-            okBtn.onclick = null; // Clear previous listeners
+            okBtn.onclick = null; 
             okBtn.onclick = () => {
                 modal.style.display = 'none';
                 onOk();
@@ -419,14 +426,11 @@
             setupForm();
             setupSearch();
             setupBarcodeScanner();
-            checkEditMode(); // New function to handle editing
+            checkEditMode(); 
         });
 
         // Barcode scanner functionality
-        let stream = null;
-        let scannerActive = false;
-
-        function setupBarcodeScanner() {
+        async function setupBarcodeScanner() {
             const cameraBtn = document.getElementById('cameraBtn');
             const stopBtn = document.getElementById('stopScanBtn');
             const manualBtn = document.getElementById('manualBarcodeBtn');
@@ -439,23 +443,38 @@
             lookupBtn.addEventListener('click', lookupManualBarcode);
             cancelBtn.addEventListener('click', hideManualInput);
             
-            // Allow Enter key in barcode input
             document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     lookupManualBarcode();
                 }
             });
+
+            codeReader = new ZXing.BrowserMultiFormatReader(); 
+            
+            try {
+                videoInputDevices = await codeReader.listVideoInputDevices();
+                console.log('Video Input Devices:', videoInputDevices);
+                if (videoInputDevices.length === 0) {
+                    cameraBtn.disabled = true;
+                    showAlertModal('Camera Error', 'No video input devices found. Barcode scanning not possible.');
+                }
+            } catch (err) {
+                console.error('Error listing video input devices:', err);
+                cameraBtn.disabled = true;
+                showAlertModal('Camera Error', 'Could not access video input devices. Make sure you grant camera permissions.');
+            }
         }
 
         function showManualInput() {
             document.getElementById('manualBarcodeInput').style.display = 'block';
             document.getElementById('barcodeInput').focus();
+            document.getElementById('barcodeResult').innerHTML = ''; 
         }
 
         function hideManualInput() {
             document.getElementById('manualBarcodeInput').style.display = 'none';
             document.getElementById('barcodeInput').value = '';
-            document.getElementById('barcodeResult').innerHTML = ''; // Clear barcode result message
+            document.getElementById('barcodeResult').innerHTML = ''; 
         }
 
         function lookupManualBarcode() {
@@ -471,38 +490,54 @@
                 return;
             }
             
-            hideManualInput();
+            hideManualInput(); 
             lookupMovieByBarcode(barcode);
         }
 
         async function startScanner() {
+            const video = document.getElementById('video');
+            const scannerContainer = document.getElementById('scannerContainer');
+            const cameraBtn = document.getElementById('cameraBtn');
+            const barcodeResultDiv = document.getElementById('barcodeResult');
+
+            if (!codeReader || videoInputDevices.length === 0) {
+                showAlertModal('Scanner Error', 'Scanner not initialized or no camera found.');
+                return;
+            }
+
+            scannerContainer.style.display = 'block';
+            cameraBtn.textContent = 'Scanning...';
+            cameraBtn.disabled = true;
+            barcodeResultDiv.innerHTML = `
+                <p>📸 <strong>Scanning Tips:</strong></p>
+                <ul style="text-align: left; margin: 10px 0; list-style-position: inside;">
+                    <li>Ensure good lighting and hold barcode steady.</li>
+                    <li>The scanner automatically tries to find the barcode.</li>
+                    <li>Look for the red scan line as a visual cue.</li>
+                </ul>
+            `;
+
             try {
-                const video = document.getElementById('video');
-                const scannerContainer = document.getElementById('scannerContainer');
-                const cameraBtn = document.getElementById('cameraBtn');
+                const selectedDeviceId = videoInputDevices[0].deviceId; 
                 
-                // Request camera access
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: 'environment', // Use back camera on mobile
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    } 
+                console.log('Starting ZXing decodeFromVideoDevice...');
+                codeReader.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
+                    if (result) {
+                        console.log('ZXing Scan Result:', result.text);
+                        stopScanner(); 
+                        lookupMovieByBarcode(result.text);
+                    }
+                    if (err && !(err instanceof ZXing.NotFoundException)) {
+                        console.error('ZXing Scan Error:', err);
+                        barcodeResultDiv.innerHTML = `<p style="color: red;">Scanner Error: ${err.message}</p>`;
+                        stopScanner(); 
+                        showAlertModal('Scanner Error', `An error occurred during scanning: ${err.message}`);
+                    }
                 });
-                
-                video.srcObject = stream;
-                scannerContainer.style.display = 'block';
-                cameraBtn.textContent = 'Scanning...';
-                cameraBtn.disabled = true;
-                
-                scannerActive = true;
-                
-                // Load barcode scanning library
-                loadBarcodeScanner();
-                
-            } catch (error) {
-                console.error('Camera access denied:', error);
-                showAlertModal('Camera Access Denied', 'Camera access is required for barcode scanning. Please allow camera permission and try again.');
+            } catch (err) {
+                console.error('Error starting ZXing scanner:', err);
+                showAlertModal('Camera Error', `Could not start camera: ${err.message}. Please check camera permissions and ensure no other app is using it.`);
+                stopScanner();
             }
         }
 
@@ -511,9 +546,8 @@
             const scannerContainer = document.getElementById('scannerContainer');
             const cameraBtn = document.getElementById('cameraBtn');
             
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
+            if (codeReader) {
+                codeReader.reset(); 
             }
             
             video.srcObject = null;
@@ -521,162 +555,32 @@
             cameraBtn.textContent = 'Scan Barcode';
             cameraBtn.disabled = false;
             
-            scannerActive = false;
-            
-            // Stop Quagga if it's running
-            if (window.Quagga && Quagga.initialized) { // Check for initialized property
-                Quagga.stop();
-                Quagga.initialized = false; // Reset custom flag
-            }
-            document.getElementById('barcodeResult').innerHTML = ''; // Clear result
+            document.getElementById('barcodeResult').innerHTML = ''; 
         }
 
-        function loadBarcodeScanner() {
-            // Load QuaggaJS library for barcode scanning
-            if (!window.Quagga || !Quagga.initialized) { // Check for custom initialized flag
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
-                script.onload = initQuagga;
-                document.head.appendChild(script);
-            } else {
-                initQuagga();
-            }
-        }
-
-        function initQuagga() {
-            if (!scannerActive) return;
-            if (window.Quagga.initialized) { // Prevent re-initialization if already running
-                Quagga.start();
-                return;
-            }
-
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#video'),
-                    constraints: {
-                        width: { ideal: 1280, min: 640 },
-                        height: { ideal: 720, min: 480 },
-                        facingMode: "environment",
-                        aspectRatio: { ideal: 16/9 }
-                    }
-                },
-                locator: {
-                    patchSize: "large",
-                    halfSample: false,
-                    // debug: {
-                    //     showCanvas: true, // Only for debugging
-                    //     showPatches: false,
-                    //     showFoundPatches: false,
-                    //     showSkeleton: false,
-                    //     showLabels: false,
-                    //     showPatchLabels: false,
-                    //     showRemainingPatchLabels: false,
-                    //     boxFromPatches: {
-                    //         showTransformed: true,
-                    //         showTransformedBox: true,
-                    //         showBB: true
-                    //     }
-                    // }
-                },
-                numOfWorkers: navigator.hardwareConcurrency || 4,
-                frequency: 10,
-                decoder: {
-                    readers: [
-                        "ean_reader",
-                        "ean_8_reader", 
-                        "ean_13_reader",
-                        "code_128_reader",
-                        "code_39_reader",
-                        "upc_reader",
-                        "upc_e_reader"
-                    ],
-                    // debug: { // Only for debugging
-                    //     drawBoundingBox: true,
-                    //     showFrequency: true,
-                    //     drawScanline: true,
-                    //     showPattern: true
-                    // }
-                },
-                locate: true
-            }, function(err) {
-                if (err) {
-                    console.error('Quagga initialization failed:', err);
-                    document.getElementById('barcodeResult').innerHTML = `
-                        <p style="color: red;">❌ Scanner initialization failed. Error: ${err.message}. Please try refreshing the page or check camera permissions.</p>
-                    `;
-                    return;
-                }
-                console.log("Quagga initialization finished. Ready to start");
-                Quagga.start();
-                Quagga.initialized = true; // Set custom flag
-                
-                // Add scanning tips
-                document.getElementById('barcodeResult').innerHTML = `
-                    <p>📸 <strong>Scanning Tips:</strong></p>
-                    <ul style="text-align: left; margin: 10px 0; list-style-position: inside;">
-                        <li>Hold the barcode 6-12 inches from camera</li>
-                        <li>Ensure good lighting</li>
-                        <li>Keep the barcode flat and steady</li>
-                        <li>Try different angles if it's not reading</li>
-                        <li>Look for the red scan line to cross the barcode</li>
-                    </ul>
-                `;
-            });
-
-            // Listen for successful barcode detection with quality filtering
-            Quagga.onDetected(function(result) {
-                const code = result.codeResult.code;
-                const quality = result.codeResult.quality || 0;
-                
-                console.log('Barcode detected:', code, 'Quality:', quality);
-                
-                // Only accept high-quality scans to reduce false positives
-                if (quality > 0.8) { // Increased quality threshold
-                    // Stop scanning after detection
-                    Quagga.stop();
-                    stopScanner();
-                    
-                    // Look up movie by barcode
-                    lookupMovieByBarcode(code);
-                } else {
-                    document.getElementById('barcodeResult').innerHTML = `
-                        <p style="color: orange;">Barcode detected, but quality is low (${(quality * 100).toFixed(1)}%). Trying for better scan...</p>
-                        <p>📸 <strong>Scanning Tips:</strong></p>
-                        <ul style="text-align: left; margin: 10px 0; list-style-position: inside;">
-                            <li>Hold the barcode 6-12 inches from camera</li>
-                            <li>Ensure good lighting</li>
-                            <li>Keep the barcode flat and steady</li>
-                            <li>Try different angles if it's not reading</li>
-                            <li>Look for the red scan line to cross the barcode</li>
-                        </ul>
-                    `;
-                    console.log('Low quality scan, continuing...');
-                }
-            });
-
-            // Quagga.onProcessed is for debugging visuals, removed debug options
-            // Quagga.onProcessed(function(result) {
-            //     if (result && result.codeResult && result.codeResult.code) {
-            //         console.log('Processing attempt:', result.codeResult.code, 'Quality:', result.codeResult.quality);
-            //     }
-            // });
-        }
+        // Add a CORS proxy for UPC Item DB calls
+        const CORS_PROXY_URL = 'https://cors-anywhere.herokuapp.com/'; 
 
         async function lookupMovieByBarcode(barcode) {
             const resultDiv = document.getElementById('barcodeResult');
             resultDiv.innerHTML = `<p>🔍 Looking up barcode: <strong>${barcode}</strong>...</p>`;
             
             try {
-                // Step 1: Look up the barcode in UPC database
-                const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
-                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); 
+
+                const upcResponse = await fetch(`${CORS_PROXY_URL}https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`, { signal: controller.signal });
+                clearTimeout(timeoutId); 
+
                 if (!upcResponse.ok) {
-                    throw new Error('UPC lookup failed');
+                    if (upcResponse.status === 403) {
+                         throw new Error('UPC API access denied (403 Forbidden). You might be exceeding trial limits or your IP is blocked.');
+                    }
+                    throw new Error(`UPC lookup failed with status: ${upcResponse.status} ${upcResponse.statusText}`);
                 }
                 
                 const upcData = await upcResponse.json();
+                console.log("UPC Data:", upcData); 
                 
                 if (!upcData.items || upcData.items.length === 0) {
                     resultDiv.innerHTML = `
@@ -696,10 +600,9 @@
                     <p>🎬 Searching TMDb for movie details...</p>
                 `;
                 
-                // Step 2: Extract movie title from product name
                 const movieTitle = extractMovieTitle(productName);
+                console.log('Extracted Movie Title for TMDb:', movieTitle); 
                 
-                // Step 3: Search TMDb for the movie
                 const tmdbResponse = await fetch(
                     `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(movieTitle)}`
                 );
@@ -709,6 +612,7 @@
                 }
                 
                 const tmdbData = await tmdbResponse.json();
+                console.log("TMDb Search Data:", tmdbData); 
                 
                 if (tmdbData.results.length === 0) {
                     resultDiv.innerHTML = `
@@ -717,13 +621,11 @@
                         <p>Try searching manually with a different title, or fill the form below.</p>
                     `;
                     
-                    // Pre-fill search box with extracted title
                     document.getElementById('movieSearch').value = movieTitle;
                     showAlertModal('Movie Not Found', `Found product "${productName}" but no movie match on TMDb for "${movieTitle}".`);
                     return;
                 }
                 
-                // Step 4: Auto-select the first movie result
                 const movie = tmdbData.results[0];
                 
                 resultDiv.innerHTML = `
@@ -732,10 +634,8 @@
                     <p>📝 Auto-filling form...</p>
                 `;
                 
-                // Auto-populate the form
                 await selectMovie(movie.id);
                 
-                // Update result message
                 setTimeout(() => {
                     resultDiv.innerHTML = `
                         <p style="color: green;">🎉 <strong>Success!</strong> Found and loaded: <strong>${movie.title}</strong></p>
@@ -748,39 +648,47 @@
                 console.error('Barcode lookup error:', error);
                 resultDiv.innerHTML = `
                     <p style="color: red;">❌ Error looking up barcode: <strong>${barcode}</strong></p>
-                    <p>This might be due to network issues, or the barcode is not recognized.</p>
+                    <p>Details: ${error.message}</p>
+                    <p>This might be due to network issues, API rate limits, or the barcode not being in our databases.</p>
                     <p><em>Try searching manually in the search box above!</em></p>
                 `;
-                showAlertModal('Lookup Error', `An error occurred while looking up barcode ${barcode}. Please check your internet connection or try manual search.`);
+                showAlertModal('Lookup Error', `An error occurred while looking up barcode ${barcode}: ${error.message}. Please check your internet connection or try manual search.`);
             }
         }
 
         function extractMovieTitle(productName) {
-            // Clean up common DVD product name patterns
             let title = productName;
             
-            // Remove common DVD-related terms (case-insensitive)
-            title = title.replace(/\b(DVD|Blu-ray|Blu ray|BD|4K|UHD|Digital|Copy)\b/gi, '');
+            // Remove common DVD/Blu-ray/format terms more robustly
+            title = title.replace(/\b(DVD|Blu-ray|Blu ray|BD|4K|UHD|Digital|Copy|Widescreen|Full Screen|Anamorphic|Disc|Set|Collection)\b/gi, '');
             
-            // Remove edition information
-            title = title.replace(/\b(Special Edition|Director's Cut|Extended|Unrated|Collector's Edition|Limited Edition|Criterion Collection)\b/gi, '');
+            // Remove edition information and common metadata in parentheses/brackets
+            // This is the most crucial part for "Burn After Reading (Spotlight Series) ("
+            title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); // Removes (anything in parentheses)
+            title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim(); // Removes [anything in brackets]
             
-            // Remove format indicators like "(Widescreen)", "[Full Screen]"
-            title = title.replace(/(\(|\s|\[)(widescreen|full\s?screen|anamorphic)(\)|\s|\])/gi, '');
+            // Remove other common edition/series terms if they are not in parentheses
+            title = title.replace(/\b(Special Edition|Director's Cut|Extended|Unrated|Collector's Edition|Limited Edition|Criterion|Series|Spotlight)\b/gi, '');
 
-            // Remove year in parentheses (we'll let TMDb find the right year)
-            title = title.replace(/\(\d{4}\)/g, '');
-            
-            // Remove extra whitespace and clean up
+            // Remove years that might sneak in if not in parentheses
+            title = title.replace(/\s*\d{4}\s*/g, ' ').trim();
+
+            // Remove common punctuation/symbols that might interfere with search
+            title = title.replace(/[™®©!@#$%^&*()_+={}\[\]:;"'<>,.?/~`|\\-]/g, ' ').trim();
+
+            // Remove extra whitespace (multiple spaces to single space)
             title = title.replace(/\s+/g, ' ').trim();
             
-            // Remove leading/trailing dashes or brackets
+            // Remove leading/trailing dashes or brackets (again, after other cleaning)
             title = title.replace(/^[-\[\(]+|[-\]\)]+$/g, '').trim();
+
+            // Final trim just in case
+            title = title.trim();
             
-            return title || productName; // Fallback to original if cleaning resulted in empty string
+            // Fallback to original if cleaning resulted in empty string
+            return title || productName; 
         }
 
-        // Star rating functionality
         function setupStarRating() {
             const stars = document.querySelectorAll('.star');
             
@@ -803,7 +711,6 @@
             });
         }
 
-        // Form submission
         function setupForm() {
             document.getElementById('movieForm').addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -824,7 +731,7 @@
             }
 
             const movie = {
-                id: Date.now(), // Unique ID for new movie
+                id: Date.now(), 
                 title: title,
                 year: document.getElementById('year').value || '',
                 director: document.getElementById('director').value.trim() || '',
@@ -862,13 +769,12 @@
                 movies[movieIndex].watched = document.getElementById('watched').value === 'true';
                 movies[movieIndex].runtime = document.getElementById('runtime').value || '';
                 movies[movieIndex].review = document.getElementById('review').value.trim() || '';
-                movies[movieIndex].posterUrl = document.getElementById('movieForm').dataset.posterUrl || movies[movieIndex].posterUrl || ''; // Keep old poster if new one not set
-                // dateAdded should remain the same
+                movies[movieIndex].posterUrl = document.getElementById('movieForm').dataset.posterUrl || movies[movieIndex].posterUrl || ''; 
                 
                 localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
                 
                 showAlertModal('Success', 'Movie updated successfully!', () => {
-                    window.location.href = 'index.html'; // Go back to library after update
+                    window.location.href = 'index.html'; 
                 });
             } else {
                 showAlertModal('Error', 'Movie not found for update.');
@@ -880,12 +786,12 @@
             document.getElementById('movieForm').removeAttribute('data-poster-url');
             currentRating = 0;
             updateStars();
-            editingMovieId = null; // Reset edit mode
+            editingMovieId = null; 
             document.getElementById('formTitle').textContent = 'Add New Movie';
             document.getElementById('submitBtn').textContent = 'Add Movie';
+            document.getElementById('barcodeResult').innerHTML = ''; 
         }
 
-        // --- Edit Mode Functionality ---
         function checkEditMode() {
             const urlParams = new URLSearchParams(window.location.search);
             const movieId = urlParams.get('edit');
@@ -910,19 +816,18 @@
                     document.getElementById('runtime').value = movieToEdit.runtime;
                     document.getElementById('review').value = movieToEdit.review;
                     
-                    // Set the poster URL for the form data
                     if (movieToEdit.posterUrl) {
                         document.getElementById('movieForm').dataset.posterUrl = movieToEdit.posterUrl;
+                    } else {
+                        document.getElementById('movieForm').removeAttribute('data-poster-url');
                     }
                 } else {
                     showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
-                    clearForm(); // Clear the form if movie not found
+                    clearForm(); 
                 }
             }
         }
-        // --- End Edit Mode Functionality ---
 
-        // Search functionality
         function setupSearch() {
             const searchBtn = document.getElementById('searchBtn');
             const searchInput = document.getElementById('movieSearch');
@@ -955,7 +860,7 @@
                     throw new Error('Search failed');
                 }
                 
-                const data = await response.json();
+                const data = response.json();
                 displayResults(data.results);
                 
             } catch (error) {
@@ -976,7 +881,7 @@
             const html = results.slice(0, 10).map(movie => `
                 <div class="search-result" onclick="selectMovie(${movie.id})">
                     ${movie.poster_path ? 
-                        `<img src="${TMDB_IMAGE_BASE}${movie.poster_path}" alt="${movie.title} poster" class="search-result-poster">` :
+                        `<img src="${TMDB_IMAGE_BASE}${movie.poster_path}" alt="${movie.title} poster">` :
                         `<div class="no-poster">No Poster</div>`
                     }
                     <div class="search-result-info">
@@ -1002,27 +907,21 @@
                 
                 const movie = await response.json();
                 
-                // Find director
                 const director = movie.credits?.crew?.find(person => person.job === 'Director')?.name || '';
-                
-                // Get genres
                 const genres = movie.genres?.map(genre => genre.name).join(', ') || '';
                 
-                // Fill form
                 document.getElementById('title').value = movie.title;
                 document.getElementById('year').value = movie.release_date ? new Date(movie.release_date).getFullYear() : '';
                 document.getElementById('director').value = director;
                 document.getElementById('genre').value = genres;
                 document.getElementById('runtime').value = movie.runtime || '';
                 
-                // Store poster URL
                 if (movie.poster_path) {
                     document.getElementById('movieForm').dataset.posterUrl = `${TMDB_IMAGE_BASE}${movie.poster_path}`;
                 } else {
-                    document.getElementById('movieForm').removeAttribute('data-poster-url'); // Clear if no poster
+                    document.getElementById('movieForm').removeAttribute('data-poster-url'); 
                 }
                 
-                // Clear search
                 document.getElementById('movieSearch').value = '';
                 document.getElementById('searchResults').innerHTML = '';
                 
