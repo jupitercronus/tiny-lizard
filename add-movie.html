@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Movie - tiny lizard</title>
-    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -16,11 +16,78 @@
             background: #f5f5f5;
         }
         
+        .navbar { /* Copied from index.html for consistent look */
+            background: #333;
+            padding: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky; /* Keep navbar visible on scroll */
+            top: 0;
+            z-index: 999; /* Ensure it's above other content */
+            margin: -20px -20px 20px -20px; /* Adjust margin to align with container padding */
+            border-radius: 10px 10px 0 0; /* Match container border radius */
+        }
+
+        .nav-container { /* Copied from index.html */
+            max-width: 1200px; /* Use the same max-width as main-container for overall consistency */
+            margin: 0 auto; /* Center the nav-container */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px; /* Match main-container padding for content alignment */
+        }
+
+        .logo { /* Copied from index.html */
+            font-size: 1.8em;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+        }
+
+        .nav-links { /* Copied from index.html, adjusted for specific links */
+            display: flex;
+            gap: 20px; /* Slightly reduced gap for less items */
+            align-items: center;
+        }
+
+        .nav-link { /* Copied from index.html */
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-link.active {
+            background: #007bff; /* Highlight active page if desired */
+        }
+        
+        .logout-btn { /* Copied from index.html */
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
         .container {
             background: white;
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 0; /* Adjusted to sit right after new navbar */
         }
         
         h1 {
@@ -276,6 +343,14 @@
     </style>
 </head>
 <body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">tiny lizard</a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Home</a> <button id="logoutBtn" class="logout-btn">Logout</button> </div>
+        </div>
+    </nav>
+
     <div class="container">
         <h1 id="formTitle">Add New Movie</h1>
         
@@ -383,9 +458,10 @@
 
     <script>
         // Global variables
-        let movies = []; // No longer initialized from localStorage, only used for editing logic
+        let movies = []; 
         let currentRating = 0;
         let editingMovieId = null; 
+        let currentUser = null; 
         
         // TMDb API configuration
         const TMDB_API_KEY = '3b3635a90ec6594d6682856b6669d20d'; 
@@ -397,7 +473,6 @@
         let videoInputDevices = [];
 
         // --- Firebase Initialization ---
-        // Your web app's Firebase configuration
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
           authDomain: "tiny-lizard.firebaseapp.com",
@@ -408,9 +483,9 @@
           measurementId: "G-43FM6WR90B"
         };
 
-        // Initialize Firebase and get Firestore instance
         const app = firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore(); // 'db' is your Firestore database instance
+        const db = firebase.firestore(); 
+        const auth = firebase.auth(); 
         // --- End Firebase Initialization ---
 
         // Modals
@@ -445,29 +520,56 @@
         document.addEventListener('DOMContentLoaded', async function() { 
             console.log('Page loaded, initializing...');
             
-            showStatusMessage('Attempting to connect to database...', 'info');
-            try {
-                // Perform a simple Firestore query to check connection and collection existence
-                const testDocRef = db.collection('movies').limit(1);
-                await testDocRef.get(); 
-                
-                console.log('✅ Database connection and initial collection access successful.');
-                showStatusMessage('Database connected successfully!', 'success');
-                
-            } catch (err) {
-                console.error('Initial DB connection test failed:', err);
-                showStatusMessage('Database connection failed: ' + err.message, 'error');
-                showAlertModal('DB Connection Error', 'Failed to connect to Firebase Firestore: ' + err.message + '. Please ensure your Firebase config is correct and Firestore rules allow access.');
-            }
-
-            setupStarRating();
-            setupForm();
-            setupSearch();
-            await setupBarcodeScanner(); 
-            await checkEditMode(); 
-            
-            showStatusMessage('Ready!', 'success');
+            // Listen for authentication state changes
+            auth.onAuthStateChanged(async user => {
+                if (user) {
+                    currentUser = user;
+                    console.log('User logged in to add-movie:', user.email, 'UID:', user.uid);
+                    showStatusMessage(`Logged in as: ${user.email}`, 'info');
+                    
+                    // Initial DB connection test for add-movie page
+                    try {
+                        const testDocRef = db.collection('movies').limit(1);
+                        await testDocRef.get(); 
+                        console.log('✅ Database connection and initial collection access successful.');
+                    } catch (err) {
+                        console.error('Initial DB connection test failed:', err);
+                        showStatusMessage('Database connection failed: ' + err.message, 'error');
+                        showAlertModal('DB Connection Error', 'Failed to connect to Firebase Firestore: ' + err.message + '. Please ensure your Firebase config is correct and Firestore rules allow access.');
+                    }
+                    
+                    setupStarRating();
+                    setupForm();
+                    setupSearch();
+                    await setupBarcodeScanner(); 
+                    await checkEditMode(); 
+                    setupLogout(); // Setup logout button listener
+                    
+                } else {
+                    currentUser = null;
+                    console.log('User not logged in to add-movie, redirecting to auth.html');
+                    window.location.href = 'auth.html'; 
+                }
+            });
         });
+
+        // --- Logout Functionality (NEW in add-movie.html) ---
+        function setupLogout() {
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) { // Ensure button exists before adding listener
+                logoutBtn.addEventListener('click', async () => {
+                    try {
+                        await auth.signOut();
+                        showAlertModal('Logged Out', 'You have been successfully logged out.', () => {
+                            window.location.href = 'auth.html'; 
+                        });
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                        showAlertModal('Logout Failed', 'An error occurred during logout: ' + error.message);
+                    }
+                });
+            }
+        }
 
         // Barcode scanner functionality
         async function setupBarcodeScanner() {
@@ -477,13 +579,13 @@
             const stopBtn = document.getElementById('stopScanBtn');
             const manualBtn = document.getElementById('manualBarcodeBtn');
             const lookupBtn = document.getElementById('lookupBarcodeBtn');
-            const cancelBtn = document.getElementById('cancelBarcodeBtn'); // Corrected variable name
+            const cancelBtn = document.getElementById('cancelBarcodeBtn'); 
             
             cameraBtn.addEventListener('click', startScanner);
             stopBtn.addEventListener('click', stopScanner);
             manualBtn.addEventListener('click', showManualInput);
             lookupBtn.addEventListener('click', lookupManualBarcode);
-            cancelBtn.addEventListener('click', hideManualInput); // Use correct variable name
+            cancelBtn.addEventListener('click', hideManualInput); 
             
             document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
@@ -525,6 +627,7 @@
             document.getElementById('barcodeResult').innerHTML = ''; 
             document.getElementById('cameraBtn').disabled = true; 
             document.getElementById('searchBtn').disabled = true; 
+            document.getElementById('movieForm').style.pointerEvents = 'none'; // Disable form interaction
             showStatusMessage('Enter a barcode manually', 'info');
         }
 
@@ -534,6 +637,7 @@
             document.getElementById('barcodeResult').innerHTML = ''; 
             document.getElementById('cameraBtn').disabled = false; 
             document.getElementById('searchBtn').disabled = false; 
+            document.getElementById('movieForm').style.pointerEvents = 'auto'; // Re-enable form interaction
             showStatusMessage('', 'info'); 
         }
 
@@ -572,6 +676,7 @@
                 cameraBtn.disabled = true; 
                 document.getElementById('searchBtn').disabled = true; 
                 document.getElementById('manualBarcodeBtn').disabled = true; 
+                document.getElementById('movieForm').style.pointerEvents = 'none'; // Disable form interaction
 
                 showStatusMessage('Starting camera... Hold barcode steady in view.', 'info');
 
@@ -626,6 +731,7 @@
             cameraBtn.disabled = false; 
             document.getElementById('searchBtn').disabled = false; 
             document.getElementById('manualBarcodeBtn').disabled = false; 
+            document.getElementById('movieForm').style.pointerEvents = 'auto'; // Re-enable form interaction
 
             document.getElementById('barcodeResult').innerHTML = ''; 
             showStatusMessage('Camera stopped', 'info');
@@ -827,6 +933,11 @@
                 e.preventDefault();
                 console.log('Form submitted');
                 
+                if (!currentUser) { // Check authentication before submitting form
+                    showAlertModal('Authentication Required', 'You must be logged in to add or update movies.');
+                    return;
+                }
+
                 if (editingMovieId) {
                     updateMovie();
                 } else {
@@ -861,12 +972,12 @@
                     runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null, 
                     review: document.getElementById('review').value.trim() || null,
                     posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
-                    dateAdded: new Date().toISOString() 
+                    dateAdded: firebase.firestore.FieldValue.serverTimestamp(), 
+                    userId: currentUser.uid 
                 };
 
                 console.log('Inserting movie:', newMovie);
 
-                // Add a new document to the 'movies' collection
                 const docRef = await db.collection('movies').add(newMovie);
                 console.log("Document written with ID: ", docRef.id);
                 
@@ -902,6 +1013,11 @@
                     return;
                 }
 
+                if (!currentUser) {
+                    showAlertModal('Authentication Required', 'You must be logged in to update movies.');
+                    return;
+                }
+
                 const updatedMovie = {
                     title: title,
                     year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null,
@@ -916,7 +1032,6 @@
 
                 console.log('Updating movie:', updatedMovie);
 
-                // Update an existing document by its ID
                 await db.collection('movies').doc(editingMovieId).update(updatedMovie);
 
                 console.log('Movie updated successfully!');
@@ -946,11 +1061,15 @@
             document.getElementById('statusMessage').innerHTML = '';
         }
 
-        // --- Edit Mode Functionality ---
         async function checkEditMode() { 
             console.log('Checking edit mode...');
             const urlParams = new URLSearchParams(window.location.search);
             const movieId = urlParams.get('edit');
+
+            if (!currentUser) { 
+                console.log("No user logged in, cannot check edit mode.");
+                return;
+            }
 
             if (movieId) {
                 editingMovieId = movieId; 
@@ -958,7 +1077,6 @@
                 showStatusMessage('Loading movie for editing...', 'info');
 
                 try {
-                    // Fetch a single document by its ID
                     const doc = await db.collection('movies').doc(movieId).get();
 
                     if (!doc.exists) {
@@ -968,6 +1086,14 @@
                         clearForm(); 
                     } else {
                         const movieToEdit = doc.data();
+                        
+                        if (movieToEdit.userId !== currentUser.uid) {
+                            showAlertModal('Permission Denied', 'You do not have permission to edit this movie.');
+                            console.warn('Attempted to edit movie not owned by current user:', movieToEdit.userId, 'Current user:', currentUser.uid);
+                            window.location.href = 'index.html'; 
+                            return;
+                        }
+
                         console.log('Loaded movie for editing:', movieToEdit);
                         
                         document.getElementById('formTitle').textContent = 'Edit Movie';
@@ -1002,7 +1128,6 @@
             }
         }
 
-        // --- Movie Search Functionality ---
         function setupSearch() {
             console.log('Setting up search...');
             const searchBtn = document.getElementById('searchBtn');

@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>tiny lizard</title>
-    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
-    <!-- If you enabled Analytics, add this too -->
-    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-analytics-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -74,6 +72,22 @@
 
         .add-movie-btn:hover {
             background: #0056b3;
+        }
+        
+        .logout-btn { 
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .logout-btn:hover { 
+            background: #c82333;
         }
 
         .main-container {
@@ -164,6 +178,32 @@
             gap: 15px;
             align-items: center;
         }
+        /* NEW STYLES FOR VIEW MODE BUTTONS */
+        .view-mode-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-top: 15px; /* Added spacing from filter buttons */
+            justify-content: flex-end; /* Align to the right */
+        }
+
+        .view-mode-btn {
+            background: white;
+            color: #333;
+            border: 1px solid #ddd;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-mode-btn:hover,
+        .view-mode-btn.active {
+            background: #28a745; /* Green for view modes */
+            color: white;
+            border-color: #28a745;
+        }
+
 
         .filter-btn {
             background: white;
@@ -454,6 +494,7 @@
                 <a href="#" class="nav-link">Lists</a>
                 <a href="#" class="nav-link">Stats</a>
                 <a href="add-movie.html" class="add-movie-btn">+ Add Movie</a>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
             </div>
         </div>
     </nav>
@@ -462,6 +503,7 @@
         <div class="hero-section">
             <h1 class="hero-title">Your Movie Collection</h1>
             <p class="hero-subtitle">Track, rate, and organize your DVD library</p>
+            <p id="userStatus" style="font-size: 0.9em; color: #888; margin-top: -15px;"></p>
         </div>
 
         <div class="stats-grid">
@@ -493,6 +535,10 @@
                 <button class="filter-btn" data-filter="unwatched">Unwatched</button>
                 <button class="filter-btn" data-filter="favorites">5 Stars</button>
             </div>
+            <div class="view-mode-controls">
+                <button class="view-mode-btn active" data-view="my">My Movies</button>
+                <button class="view-mode-btn" data-view="all">All Movies</button>
+            </div>
         </div>
 
         <div id="moviesContainer">
@@ -504,7 +550,6 @@
         </div>
     </div>
 
-    <!-- Custom Modals -->
     <div id="confirmationModal" class="modal">
         <div class="modal-content">
             <h3 id="confirmationModalTitle">Confirm Action</h3>
@@ -528,7 +573,9 @@
 
     <script>
         // Global variables
-        let movies = []; // Will be populated from Firestore
+        let movies = []; 
+        let currentUser = null; 
+        let currentViewMode = 'my'; // 'my' or 'all'
 
         // --- Modal Functions ---
         function showConfirmationModal(title, message, onConfirm) {
@@ -570,7 +617,6 @@
         // --- End Modal Functions ---
 
         // --- Firebase Initialization ---
-        // Your web app's Firebase configuration
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
           authDomain: "tiny-lizard.firebaseapp.com",
@@ -581,27 +627,91 @@
           measurementId: "G-43FM6WR90B"
         };
 
-        // Initialize Firebase and get Firestore instance
         const app = firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore(); // 'db' is your Firestore database instance
+        const db = firebase.firestore(); 
+        const auth = firebase.auth(); 
         // --- End Firebase Initialization ---
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {
             setupSearch();
             setupFilters();
-            loadMoviesFromFirestore(); // Call new function to load from Firestore
+            setupViewModeControls(); // NEW: Setup view mode buttons
+            setupLogout(); 
+            
+            // Listen for authentication state changes
+            auth.onAuthStateChanged(user => {
+                const userStatusDiv = document.getElementById('userStatus');
+                if (user) {
+                    currentUser = user;
+                    userStatusDiv.textContent = `Logged in as: ${user.email}`;
+                    console.log('User logged in:', user.email, 'UID:', user.uid);
+                    loadMoviesFromFirestore(currentViewMode); // Load movies based on current view mode
+                } else {
+                    currentUser = null;
+                    userStatusDiv.textContent = 'Not logged in';
+                    console.log('User not logged in, redirecting to auth.html');
+                    window.location.href = 'auth.html'; 
+                }
+            });
         });
 
-        // --- Firestore Integration ---
-        async function loadMoviesFromFirestore() {
+        // --- Logout Functionality ---
+        function setupLogout() {
+            const logoutBtn = document.getElementById('logoutBtn');
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    await auth.signOut();
+                    showAlertModal('Logged Out', 'You have been successfully logged out.', () => {
+                        window.location.href = 'auth.html'; 
+                    });
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    showAlertModal('Logout Failed', 'An error occurred during logout: ' + error.message);
+                }
+            });
+        }
+
+        // --- View Mode Controls (NEW) ---
+        function setupViewModeControls() {
+            const viewModeBtns = document.querySelectorAll('.view-mode-btn');
+            viewModeBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    viewModeBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    currentViewMode = this.dataset.view;
+                    loadMoviesFromFirestore(currentViewMode); // Reload movies based on new view mode
+                });
+            });
+        }
+
+        // --- Firestore Integration (Loading and Deleting) ---
+        async function loadMoviesFromFirestore(viewMode) { // Now accepts viewMode
+            if (!currentUser) {
+                console.log("No user logged in, cannot load movies.");
+                movies = []; 
+                displayMovies();
+                updateStats();
+                return;
+            }
+
             try {
-                const moviesRef = db.collection('movies'); // Get a reference to the 'movies' collection
-                const snapshot = await moviesRef.get(); // Get all documents in the collection
+                let moviesRef = db.collection('movies'); 
+                
+                // NEW: Apply filter based on viewMode
+                if (viewMode === 'my') {
+                    moviesRef = moviesRef.where('userId', '==', currentUser.uid);
+                    console.log('Loading ONLY my movies...');
+                } else { // viewMode === 'all'
+                    console.log('Loading ALL movies (including others)...');
+                }
+
+                const snapshot = await moviesRef.get(); 
                 
                 movies = snapshot.docs.map(doc => ({
-                    id: doc.id, // Firestore provides a unique 'id' for each document
-                    ...doc.data() // Get all fields from the document
+                    id: doc.id, 
+                    ...doc.data() 
                 }));
                 
                 console.log("Movies loaded from Firestore:", movies);
@@ -707,8 +817,10 @@
                     </div>
                     
                     <div class="movie-actions">
-                        <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
-                        <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
+                        ${currentUser && movie.userId === currentUser.uid ? `
+                            <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
+                            <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
@@ -744,6 +856,11 @@
         }
 
         function editMovie(movieId) {
+            if (!currentUser) {
+                showAlertModal('Authentication Required', 'You must be logged in to edit movies.');
+                return;
+            }
+            // The check for ownership is performed in add-movie.html's checkEditMode.
             window.location.href = `add-movie.html?edit=${movieId}`;
         }
 
@@ -751,8 +868,15 @@
             showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your collection?', async (confirmed) => {
                 if (confirmed) {
                     try {
-                        await db.collection('movies').doc(movieId).delete(); // Delete document by ID
-                        movies = movies.filter(m => m.id !== movieId); // Update local array
+                        // Crucially, check if the movie belongs to the current user before allowing delete
+                        const movieToDelete = movies.find(m => m.id === movieId);
+                        if (!currentUser || !movieToDelete || movieToDelete.userId !== currentUser.uid) {
+                            showAlertModal('Permission Denied', 'You can only delete movies you added.');
+                            return;
+                        }
+                        
+                        await db.collection('movies').doc(movieId).delete(); 
+                        movies = movies.filter(m => m.id !== movieId); 
                         displayMovies();
                         updateStats();
                         showAlertModal('Success', 'Movie deleted successfully!');
@@ -763,13 +887,6 @@
                 }
             });
         }
-
-        // Sync with Firestore when page becomes visible
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                loadMoviesFromFirestore(); // Reload from Firestore
-            }
-        });
     </script>
 </body>
 </html>
