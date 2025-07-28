@@ -450,6 +450,7 @@
         function showManualInput() {
             document.getElementById('manualBarcodeInput').style.display = 'block';
             document.getElementById('barcodeInput').focus();
+            document.getElementById('barcodeResult').innerHTML = ''; // Clear barcode result message
         }
 
         function hideManualInput() {
@@ -471,7 +472,7 @@
                 return;
             }
             
-            hideManualInput();
+            hideManualInput(); // Hide input, but we'll show results in barcodeResult div
             lookupMovieByBarcode(barcode);
         }
 
@@ -503,6 +504,7 @@
             } catch (error) {
                 console.error('Camera access denied:', error);
                 showAlertModal('Camera Access Denied', 'Camera access is required for barcode scanning. Please allow camera permission and try again.');
+                stopScanner(); // Ensure scanner is stopped if camera access fails
             }
         }
 
@@ -537,6 +539,11 @@
                 const script = document.createElement('script');
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
                 script.onload = initQuagga;
+                // Add an error handler for the script
+                script.onerror = () => {
+                    showAlertModal('Library Error', 'Failed to load barcode scanner library. Check your internet connection or the script URL.');
+                    stopScanner();
+                };
                 document.head.appendChild(script);
             } else {
                 initQuagga();
@@ -546,6 +553,7 @@
         function initQuagga() {
             if (!scannerActive) return;
             if (window.Quagga.initialized) { // Prevent re-initialization if already running
+                console.log("Quagga already initialized, starting detection.");
                 Quagga.start();
                 return;
             }
@@ -565,19 +573,18 @@
                 locator: {
                     patchSize: "large",
                     halfSample: false,
-                    // debug: {
-                    //     showCanvas: true, // Only for debugging
-                    //     showPatches: false,
-                    //     showFoundPatches: false,
-                    //     showSkeleton: false,
-                    //     showLabels: false,
-                    //     showPatchLabels: false,
-                    //     showRemainingPatchLabels: false,
-                    //     boxFromPatches: {
-                    //         showTransformed: true,
-                    //         showTransformedBox: true,
-                    //         showBB: true
-                    //     }
+                    // Temporarily uncomment these for debugging:
+                    // showCanvas: true, // Shows a canvas over the video with detection boxes
+                    // showPatches: false,
+                    // showFoundPatches: false,
+                    // showSkeleton: false,
+                    // showLabels: false,
+                    // showPatchLabels: false,
+                    // showRemainingPatchLabels: false,
+                    // boxFromPatches: {
+                    //     showTransformed: true,
+                    //     showTransformedBox: true,
+                    //     showBB: true
                     // }
                 },
                 numOfWorkers: navigator.hardwareConcurrency || 4,
@@ -586,16 +593,17 @@
                     readers: [
                         "ean_reader",
                         "ean_8_reader", 
-                        "ean_13_reader",
-                        "code_128_reader",
+                        "ean_13_reader", // Most common for DVDs
+                        "code_128_reader", // Sometimes used
                         "code_39_reader",
-                        "upc_reader",
+                        "upc_reader", // Common for US products
                         "upc_e_reader"
                     ],
-                    // debug: { // Only for debugging
-                    //     drawBoundingBox: true,
+                    // Temporarily uncomment these for debugging:
+                    // debug: {
+                    //     drawBoundingBox: true, // Draws the detected barcode box
                     //     showFrequency: true,
-                    //     drawScanline: true,
+                    //     drawScanline: true, // Draws the red scan line
                     //     showPattern: true
                     // }
                 },
@@ -606,6 +614,7 @@
                     document.getElementById('barcodeResult').innerHTML = `
                         <p style="color: red;">❌ Scanner initialization failed. Error: ${err.message}. Please try refreshing the page or check camera permissions.</p>
                     `;
+                    stopScanner(); // Stop camera if initialization fails
                     return;
                 }
                 console.log("Quagga initialization finished. Ready to start");
@@ -633,10 +642,11 @@
                 console.log('Barcode detected:', code, 'Quality:', quality);
                 
                 // Only accept high-quality scans to reduce false positives
-                if (quality > 0.8) { // Increased quality threshold
+                // You can adjust this threshold: lower for more detections, higher for more accuracy
+                if (quality > 0.75) { // Threshold for confidence (0.0 to 1.0)
                     // Stop scanning after detection
                     Quagga.stop();
-                    stopScanner();
+                    stopScanner(); // This will also reset the initialized flag
                     
                     // Look up movie by barcode
                     lookupMovieByBarcode(code);
@@ -670,13 +680,22 @@
             
             try {
                 // Step 1: Look up the barcode in UPC database
-                const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
-                
+                // Added a timeout to the fetch request to prevent indefinite hanging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+                const upcResponse = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`, { signal: controller.signal });
+                clearTimeout(timeoutId); // Clear timeout if fetch completes
+
                 if (!upcResponse.ok) {
-                    throw new Error('UPC lookup failed');
+                    if (upcResponse.status === 403) {
+                         throw new Error('UPC API access denied (403 Forbidden). You might be exceeding trial limits or your IP is blocked.');
+                    }
+                    throw new Error(`UPC lookup failed with status: ${upcResponse.status} ${upcResponse.statusText}`);
                 }
                 
                 const upcData = await upcResponse.json();
+                console.log("UPC Data:", upcData); // Log UPC data for inspection
                 
                 if (!upcData.items || upcData.items.length === 0) {
                     resultDiv.innerHTML = `
@@ -698,6 +717,7 @@
                 
                 // Step 2: Extract movie title from product name
                 const movieTitle = extractMovieTitle(productName);
+                console.log('Extracted Movie Title for TMDb:', movieTitle); // Log extracted title
                 
                 // Step 3: Search TMDb for the movie
                 const tmdbResponse = await fetch(
@@ -709,6 +729,7 @@
                 }
                 
                 const tmdbData = await tmdbResponse.json();
+                console.log("TMDb Search Data:", tmdbData); // Log TMDb search data for inspection
                 
                 if (tmdbData.results.length === 0) {
                     resultDiv.innerHTML = `
@@ -748,10 +769,11 @@
                 console.error('Barcode lookup error:', error);
                 resultDiv.innerHTML = `
                     <p style="color: red;">❌ Error looking up barcode: <strong>${barcode}</strong></p>
-                    <p>This might be due to network issues, or the barcode is not recognized.</p>
+                    <p>Details: ${error.message}</p>
+                    <p>This might be due to network issues, API rate limits, or the barcode not being in our databases.</p>
                     <p><em>Try searching manually in the search box above!</em></p>
                 `;
-                showAlertModal('Lookup Error', `An error occurred while looking up barcode ${barcode}. Please check your internet connection or try manual search.`);
+                showAlertModal('Lookup Error', `An error occurred while looking up barcode ${barcode}: ${error.message}. Please check your internet connection or try manual search.`);
             }
         }
 
@@ -763,14 +785,14 @@
             title = title.replace(/\b(DVD|Blu-ray|Blu ray|BD|4K|UHD|Digital|Copy)\b/gi, '');
             
             // Remove edition information
-            title = title.replace(/\b(Special Edition|Director's Cut|Extended|Unrated|Collector's Edition|Limited Edition|Criterion Collection)\b/gi, '');
+            title = title.replace(/\b(Special Edition|Director's Cut|Extended|Unrated|Collector's Edition|Limited Edition|Criterion Collection|Widescreen|Full Screen|Anamorphic)\b/gi, '');
             
-            // Remove format indicators like "(Widescreen)", "[Full Screen]"
-            title = title.replace(/(\(|\s|\[)(widescreen|full\s?screen|anamorphic)(\)|\s|\])/gi, '');
-
-            // Remove year in parentheses (we'll let TMDb find the right year)
+            // Remove years in parentheses (we'll let TMDb find the right year)
             title = title.replace(/\(\d{4}\)/g, '');
             
+            // Remove common punctuation/symbols that might interfere with search
+            title = title.replace(/[™®©]/g, '');
+
             // Remove extra whitespace and clean up
             title = title.replace(/\s+/g, ' ').trim();
             
@@ -883,6 +905,7 @@
             editingMovieId = null; // Reset edit mode
             document.getElementById('formTitle').textContent = 'Add New Movie';
             document.getElementById('submitBtn').textContent = 'Add Movie';
+            document.getElementById('barcodeResult').innerHTML = ''; // Clear barcode result message
         }
 
         // --- Edit Mode Functionality ---
@@ -913,6 +936,8 @@
                     // Set the poster URL for the form data
                     if (movieToEdit.posterUrl) {
                         document.getElementById('movieForm').dataset.posterUrl = movieToEdit.posterUrl;
+                    } else {
+                        document.getElementById('movieForm').removeAttribute('data-poster-url');
                     }
                 } else {
                     showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
@@ -976,7 +1001,7 @@
             const html = results.slice(0, 10).map(movie => `
                 <div class="search-result" onclick="selectMovie(${movie.id})">
                     ${movie.poster_path ? 
-                        `<img src="${TMDB_IMAGE_BASE}${movie.poster_path}" alt="${movie.title} poster" class="search-result-poster">` :
+                        `<img src="${TMDB_IMAGE_BASE}${movie.poster_path}" alt="${movie.title} poster">` :
                         `<div class="no-poster">No Poster</div>`
                     }
                     <div class="search-result-info">
