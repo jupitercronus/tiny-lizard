@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>tiny lizard</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -522,24 +521,20 @@
     </div>
 
     <script>
-        // Initialize Supabase Client
-        const SUPABASE_URL = 'https://xzxvnrrowfsuhragsxki.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6eHZucnJvd2ZzdWhyYWdzeGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MjI0NTUsImV4cCI6MjA2OTI5ODQ1NX0.7FhXHQn8wkClZTlvEoVxphzohjqI_vGuG1feT_fpn6o';
-        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
         // Global variables
-        let movies = []; 
+        let movies = JSON.parse(localStorage.getItem('tinyLizardMovies')) || [];
 
         // --- Modal Functions ---
         function showConfirmationModal(title, message, onConfirm) {
             const modal = document.getElementById('confirmationModal');
             document.getElementById('confirmationModalTitle').textContent = title;
             document.getElementById('confirmationModalMessage').textContent = message;
-            modal.style.display = 'flex'; 
+            modal.style.display = 'flex'; // Use flex to center content
 
             const yesBtn = document.getElementById('confirmModalYes');
             const noBtn = document.getElementById('confirmModalNo');
 
+            // Clear previous listeners to prevent multiple calls
             yesBtn.onclick = null;
             noBtn.onclick = null;
 
@@ -557,11 +552,11 @@
             const modal = document.getElementById('alertModal');
             document.getElementById('alertModalTitle').textContent = title;
             document.getElementById('alertModalMessage').textContent = message;
-            modal.style.display = 'flex'; 
+            modal.style.display = 'flex'; // Use flex to center content
 
             const okBtn = document.getElementById('alertModalOk');
 
-            okBtn.onclick = null; 
+            okBtn.onclick = null; // Clear previous listeners
             okBtn.onclick = () => {
                 modal.style.display = 'none';
                 onOk();
@@ -574,26 +569,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupSearch();
             setupFilters();
-            loadMovies(); 
+            displayMovies();
+            updateStats();
         });
-
-        // --- Supabase Integration ---
-        async function loadMovies() {
-            const { data, error } = await supabase
-                .from('movies') 
-                .select('*'); 
-
-            if (error) {
-                console.error('Error fetching movies:', error);
-                showAlertModal('Error', 'Failed to load movies from database.');
-            } else {
-                movies = data; 
-                displayMovies();
-                updateStats();
-            }
-        }
-        // --- End Supabase Integration ---
-
 
         // Search functionality
         function setupSearch() {
@@ -608,9 +586,11 @@
             const filterBtns = document.querySelectorAll('.filter-btn');
             filterBtns.forEach(btn => {
                 btn.addEventListener('click', function() {
+                    // Update active state
                     filterBtns.forEach(b => b.classList.remove('active'));
                     this.classList.add('active');
                     
+                    // Apply filter
                     const filter = this.dataset.filter;
                     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
                     displayMovies(searchTerm, filter);
@@ -624,6 +604,7 @@
             
             let filteredMovies = movies;
             
+            // Apply search filter
             if (searchTerm) {
                 filteredMovies = filteredMovies.filter(movie => 
                     movie.title.toLowerCase().includes(searchTerm) ||
@@ -632,6 +613,7 @@
                 );
             }
             
+            // Apply category filter
             if (filter !== 'all') {
                 switch(filter) {
                     case 'watched':
@@ -689,8 +671,8 @@
                     </div>
                     
                     <div class="movie-actions">
-                        <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
-                        <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button>
+                        <button class="btn-small btn-edit" onclick="editMovie(${movie.id})">Edit</button>
+                        <button class="btn-small btn-delete" onclick="deleteMovie(${movie.id})">Delete</button>
                     </div>
                 </div>
             `).join('');
@@ -715,6 +697,7 @@
                 ? (ratedMovies.reduce((sum, m) => sum + m.rating, 0) / ratedMovies.length).toFixed(1)
                 : '0.0';
             
+            // Calculate total hours watched
             const totalHours = movies
                 .filter(m => m.watched && m.runtime)
                 .reduce((sum, m) => sum + parseInt(m.runtime), 0);
@@ -728,34 +711,28 @@
 
         // Movie actions
         function editMovie(movieId) {
+            // Redirect to add page with edit parameter
             window.location.href = `add-movie.html?edit=${movieId}`;
         }
 
-        async function deleteMovie(movieId) {
-            showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your collection?', async (confirmed) => {
+        function deleteMovie(movieId) {
+            showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your collection?', (confirmed) => {
                 if (confirmed) {
-                    const { error } = await supabase
-                        .from('movies')
-                        .delete()
-                        .eq('id', movieId); 
-
-                    if (error) {
-                        console.error('Error deleting movie:', error);
-                        showAlertModal('Error', 'Failed to delete movie from database.');
-                    } else {
-                        movies = movies.filter(m => m.id !== movieId); 
-                        displayMovies();
-                        updateStats();
-                        showAlertModal('Success', 'Movie deleted successfully!');
-                    }
+                    movies = movies.filter(m => m.id !== movieId);
+                    localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
+                    displayMovies();
+                    updateStats();
+                    showAlertModal('Success', 'Movie deleted successfully!');
                 }
             });
         }
 
-        // Sync with Supabase when page becomes visible
+        // Sync with localStorage when page becomes visible
         document.addEventListener('visibilitychange', function() {
             if (!document.hidden) {
-                loadMovies(); 
+                movies = JSON.parse(localStorage.getItem('tinyLizardMovies')) || [];
+                displayMovies();
+                updateStats();
             }
         });
     </script>
