@@ -543,7 +543,7 @@
                     setupSearch();
                     await setupBarcodeScanner(); 
                     await checkEditMode(); 
-                    setupLogout(); // Setup logout button listener
+                    setupLogout(); 
                     
                 } else {
                     currentUser = null;
@@ -553,10 +553,10 @@
             });
         });
 
-        // --- Logout Functionality (NEW in add-movie.html) ---
+        // --- Logout Functionality ---
         function setupLogout() {
             const logoutBtn = document.getElementById('logoutBtn');
-            if (logoutBtn) { // Ensure button exists before adding listener
+            if (logoutBtn) { 
                 logoutBtn.addEventListener('click', async () => {
                     try {
                         await auth.signOut();
@@ -627,7 +627,7 @@
             document.getElementById('barcodeResult').innerHTML = ''; 
             document.getElementById('cameraBtn').disabled = true; 
             document.getElementById('searchBtn').disabled = true; 
-            document.getElementById('movieForm').style.pointerEvents = 'none'; // Disable form interaction
+            document.getElementById('movieForm').style.pointerEvents = 'none'; 
             showStatusMessage('Enter a barcode manually', 'info');
         }
 
@@ -637,7 +637,7 @@
             document.getElementById('barcodeResult').innerHTML = ''; 
             document.getElementById('cameraBtn').disabled = false; 
             document.getElementById('searchBtn').disabled = false; 
-            document.getElementById('movieForm').style.pointerEvents = 'auto'; // Re-enable form interaction
+            document.getElementById('movieForm').style.pointerEvents = 'auto'; 
             showStatusMessage('', 'info'); 
         }
 
@@ -676,7 +676,7 @@
                 cameraBtn.disabled = true; 
                 document.getElementById('searchBtn').disabled = true; 
                 document.getElementById('manualBarcodeBtn').disabled = true; 
-                document.getElementById('movieForm').style.pointerEvents = 'none'; // Disable form interaction
+                document.getElementById('movieForm').style.pointerEvents = 'none'; 
 
                 showStatusMessage('Starting camera... Hold barcode steady in view.', 'info');
 
@@ -731,7 +731,7 @@
             cameraBtn.disabled = false; 
             document.getElementById('searchBtn').disabled = false; 
             document.getElementById('manualBarcodeBtn').disabled = false; 
-            document.getElementById('movieForm').style.pointerEvents = 'auto'; // Re-enable form interaction
+            document.getElementById('movieForm').style.pointerEvents = 'auto'; 
 
             document.getElementById('barcodeResult').innerHTML = ''; 
             showStatusMessage('Camera stopped', 'info');
@@ -933,7 +933,7 @@
                 e.preventDefault();
                 console.log('Form submitted');
                 
-                if (!currentUser) { // Check authentication before submitting form
+                if (!currentUser) { 
                     showAlertModal('Authentication Required', 'You must be logged in to add or update movies.');
                     return;
                 }
@@ -962,25 +962,38 @@
                     return;
                 }
 
-                const newMovie = {
+                // Data for the main 'movies' collection (public info)
+                const mainMovieData = {
                     title: title,
                     year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null, 
                     director: document.getElementById('director').value.trim() || null, 
                     genre: document.getElementById('genre').value.trim() || null,
-                    rating: currentRating || 0, 
-                    watched: document.getElementById('watched').value === 'true',
-                    runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null, 
-                    review: document.getElementById('review').value.trim() || null,
                     posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
+                    runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null, 
+                    tmdbId: document.getElementById('movieForm').dataset.tmdbId ? parseInt(document.getElementById('movieForm').dataset.tmdbId) : null, // NEW: TMDb ID
                     dateAdded: firebase.firestore.FieldValue.serverTimestamp(), 
-                    userId: currentUser.uid 
+                    originalUploaderId: currentUser.uid // NEW: Store who originally uploaded this movie to public list
                 };
 
-                console.log('Inserting movie:', newMovie);
+                // Data for the user's personal 'movieInteractions' subcollection
+                const userInteractionData = {
+                    rating: currentRating || 0,
+                    watched: document.getElementById('watched').value === 'true', // <<< THIS LINE
+                    review: document.getElementById('review').value.trim() || null,
+                    interactionDate: firebase.firestore.FieldValue.serverTimestamp()
+                };
 
-                const docRef = await db.collection('movies').add(newMovie);
-                console.log("Document written with ID: ", docRef.id);
-                
+                // Step 1: Add the main movie document to the 'movies' collection
+                const movieDocRef = await db.collection('movies').add(mainMovieData);
+                console.log("Main movie document written with ID: ", movieDocRef.id);
+
+                // Step 2: Add the user's interaction data to their specific subcollection
+                // The movieId for the interaction will be the ID of the newly created main movie document
+                await db.collection('users').doc(currentUser.uid)
+                        .collection('movieInteractions').doc(movieDocRef.id) // Use the same ID as the main movie
+                        .set(userInteractionData); // Use .set() here to create or overwrite
+
+                console.log('Movie and user interaction added successfully!');
                 showStatusMessage('Movie added successfully!', 'success');
                 showAlertModal('Success', 'Movie added successfully!', () => {
                     clearForm();
@@ -1018,23 +1031,47 @@
                     return;
                 }
 
-                const updatedMovie = {
+                // Data for updating the main 'movies' collection (only if original uploader)
+                const mainMovieUpdates = {
                     title: title,
                     year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null,
                     director: document.getElementById('director').value.trim() || null,
                     genre: document.getElementById('genre').value.trim() || null,
-                    rating: currentRating || 0,
-                    watched: document.getElementById('watched').value === 'true',
+                    posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
                     runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null,
-                    review: document.getElementById('review').value.trim() || null,
-                    posterUrl: document.getElementById('movieForm').dataset.posterUrl || null, 
+                    // Do NOT update tmdbId or dateAdded here, only on initial add
                 };
 
-                console.log('Updating movie:', updatedMovie);
+                // Data for updating the user's personal 'movieInteractions' subcollection
+                const userInteractionUpdates = {
+                    rating: currentRating || 0,
+                    watched: document.getElementById('watched').value === 'true',
+                    review: document.getElementById('review').value.trim() || null,
+                    interactionDate: firebase.firestore.FieldValue.serverTimestamp()
+                };
 
-                await db.collection('movies').doc(editingMovieId).update(updatedMovie);
+                // Fetch the existing movie to check originalUploaderId
+                const movieDoc = await db.collection('movies').doc(editingMovieId).get();
+                if (!movieDoc.exists) {
+                    throw new Error('Movie not found for update.');
+                }
+                const existingMovieData = movieDoc.data();
 
-                console.log('Movie updated successfully!');
+                // Step 1: Update the main movie document (only if current user is original uploader)
+                if (existingMovieData.originalUploaderId === currentUser.uid) {
+                    await db.collection('movies').doc(editingMovieId).update(mainMovieUpdates);
+                    console.log('Main movie document updated!');
+                } else {
+                    console.log('Not original uploader, skipping main movie update.');
+                    // Optionally, you could show a message here that only personal details are being saved
+                }
+
+                // Step 2: Update the user's interaction data in their subcollection
+                await db.collection('users').doc(currentUser.uid)
+                        .collection('movieInteractions').doc(editingMovieId)
+                        .set(userInteractionUpdates, { merge: true }); // Use {merge: true} to only update specified fields
+
+                console.log('Movie and user interaction updated successfully!');
                 showStatusMessage('Movie updated successfully!', 'success');
                 showAlertModal('Success', 'Movie updated successfully!', () => {
                     window.location.href = 'index.html'; 
@@ -1053,6 +1090,7 @@
         function clearForm() {
             document.getElementById('movieForm').reset();
             document.getElementById('movieForm').removeAttribute('data-poster-url');
+            document.getElementById('movieForm').removeAttribute('data-tmdb-id'); // Clear tmdbId too
             currentRating = 0;
             updateStars();
             editingMovieId = null; 
@@ -1064,70 +1102,87 @@
         async function checkEditMode() { 
             console.log('Checking edit mode...');
             const urlParams = new URLSearchParams(window.location.search);
-            const movieId = urlParams.get('edit');
+            const movieId = urlToEditId || urlParams.get('edit'); // Use globally stored or URL param
 
             if (!currentUser) { 
                 console.log("No user logged in, cannot check edit mode.");
                 return;
             }
+            if (!movieId) { // If no movieId provided, just return
+                return;
+            }
 
-            if (movieId) {
-                editingMovieId = movieId; 
-                document.getElementById('formTitle').textContent = 'Loading Movie for Edit...';
-                showStatusMessage('Loading movie for editing...', 'info');
+            editingMovieId = movieId; // Store the Firestore doc ID
 
-                try {
-                    const doc = await db.collection('movies').doc(movieId).get();
+            document.getElementById('formTitle').textContent = 'Loading Movie for Edit...';
+            showStatusMessage('Loading movie for editing...', 'info');
 
-                    if (!doc.exists) {
-                        console.error('Error: Movie not found for editing with ID:', movieId);
-                        showStatusMessage('Movie not found for editing', 'error');
-                        showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
-                        clearForm(); 
-                    } else {
-                        const movieToEdit = doc.data();
-                        
-                        if (movieToEdit.userId !== currentUser.uid) {
-                            showAlertModal('Permission Denied', 'You do not have permission to edit this movie.');
-                            console.warn('Attempted to edit movie not owned by current user:', movieToEdit.userId, 'Current user:', currentUser.uid);
-                            window.location.href = 'index.html'; 
-                            return;
-                        }
+            try {
+                // Step 1: Fetch the main movie document
+                const movieDoc = await db.collection('movies').doc(movieId).get();
 
-                        console.log('Loaded movie for editing:', movieToEdit);
-                        
-                        document.getElementById('formTitle').textContent = 'Edit Movie';
-                        document.getElementById('submitBtn').textContent = 'Update Movie';
-
-                        document.getElementById('title').value = movieToEdit.title || '';
-                        document.getElementById('year').value = movieToEdit.year || '';
-                        document.getElementById('director').value = movieToEdit.director || '';
-                        document.getElementById('genre').value = movieToEdit.genre || '';
-                        
-                        currentRating = movieToEdit.rating || 0;
-                        updateStars();
-                        
-                        document.getElementById('watched').value = movieToEdit.watched ? 'true' : 'false';
-                        document.getElementById('runtime').value = movieToEdit.runtime || '';
-                        document.getElementById('review').value = movieToEdit.review || '';
-                        
-                        if (movieToEdit.posterUrl) {
-                            document.getElementById('movieForm').dataset.posterUrl = movieToEdit.posterUrl;
-                        } else {
-                            document.getElementById('movieForm').removeAttribute('data-poster-url');
-                        }
-                        
-                        showStatusMessage('Movie loaded for editing', 'success');
-                    }
-                } catch (error) {
-                    console.error('Unexpected error loading movie:', error);
-                    showStatusMessage('Unexpected error loading movie: ' + error.message, 'error');
-                    showAlertModal('Error', 'An unexpected error occurred while loading the movie.');
-                    clearForm();
+                if (!movieDoc.exists) {
+                    console.error('Error: Main movie document not found for editing with ID:', movieId);
+                    showStatusMessage('Movie not found for editing', 'error');
+                    showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
+                    clearForm(); 
+                    return;
                 }
+                const mainMovieData = movieDoc.data();
+
+                // Step 2: Fetch the user's specific interaction for this movie
+                const userInteractionDoc = await db.collection('users').doc(currentUser.uid)
+                                                .collection('movieInteractions').doc(movieId).get();
+                
+                let userInteractionData = {};
+                if (userInteractionDoc.exists) {
+                    userInteractionData = userInteractionDoc.data();
+                    console.log('User-specific interaction data loaded:', userInteractionData);
+                } else {
+                    console.log('No existing user-specific interaction data for this movie. Will use defaults/empty.');
+                }
+
+                // Populate the form with main movie data
+                document.getElementById('title').value = mainMovieData.title || '';
+                document.getElementById('year').value = mainMovieData.year || '';
+                document.getElementById('director').value = mainMovieData.director || '';
+                document.getElementById('genre').value = mainMovieData.genre || '';
+                document.getElementById('runtime').value = mainMovieData.runtime || '';
+                
+                // Set poster URL and TMDb ID
+                if (mainMovieData.posterUrl) {
+                    document.getElementById('movieForm').dataset.posterUrl = mainMovieData.posterUrl;
+                } else {
+                    document.getElementById('movieForm').removeAttribute('data-poster-url');
+                }
+                if (mainMovieData.tmdbId) {
+                    document.getElementById('movieForm').dataset.tmdbId = mainMovieData.tmdbId;
+                } else {
+                    document.getElementById('movieForm').removeAttribute('data-tmdb-id');
+                }
+
+                // Populate rating, watched, review from user's interaction data
+                currentRating = userInteractionData.rating || 0;
+                updateStars();
+                document.getElementById('watched').value = userInteractionData.watched ? 'true' : 'false';
+                document.getElementById('review').value = userInteractionData.review || '';
+                
+                document.getElementById('formTitle').textContent = 'Edit Movie';
+                document.getElementById('submitBtn').textContent = 'Update Movie';
+                showStatusMessage('Movie loaded for editing', 'success');
+
+            } catch (error) {
+                console.error('Unexpected error loading movie:', error);
+                showStatusMessage('Unexpected error loading movie: ' + error.message, 'error');
+                showAlertModal('Error', 'An unexpected error occurred while loading the movie.');
+                clearForm();
             }
         }
+        
+        // This is a global variable to pass TMDB ID from barcode/search to checkEditMode directly
+        let urlToEditId = null;
 
+        // --- Movie Search Functionality ---
         function setupSearch() {
             console.log('Setting up search...');
             const searchBtn = document.getElementById('searchBtn');
@@ -1242,12 +1297,12 @@
             }
         }
 
-        async function selectMovie(movieId) {
+        async function selectMovie(tmdbMovieId) { // Renamed parameter to clarify it's TMDb ID
             try {
                 showStatusMessage('Loading movie details...', 'info');
-                console.log('Selecting movie ID:', movieId);
+                console.log('Selecting movie ID:', tmdbMovieId);
                 
-                const detailsUrl = `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
+                const detailsUrl = `${TMDB_BASE_URL}/movie/${tmdbMovieId}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
                 console.log('TMDb details URL:', detailsUrl);
                 
                 const response = await fetch(detailsUrl);
@@ -1273,6 +1328,7 @@
                 document.getElementById('genre').value = genres;
                 document.getElementById('runtime').value = movie.runtime || '';
                 
+                // Set poster URL and NEW TMDb ID on the form's dataset
                 if (movie.poster_path) {
                     const posterUrl = `${TMDB_IMAGE_BASE}${movie.poster_path}`;
                     document.getElementById('movieForm').dataset.posterUrl = posterUrl;
@@ -1281,11 +1337,42 @@
                     document.getElementById('movieForm').removeAttribute('data-poster-url'); 
                     console.log('No poster available');
                 }
-                
+                document.getElementById('movieForm').dataset.tmdbId = tmdbMovieId; // NEW: Store TMDb ID on form
+                console.log('TMDb ID set:', tmdbMovieId);
+
+                // Check if this movie (by TMDb ID) already exists in Firestore's 'movies' collection
+                // This is important because the 'edit' logic will now rely on Firestore's Document ID,
+                // but adding via search/barcode means we first have a TMDB ID.
+                const existingMovieQuery = await db.collection('movies').where('tmdbId', '==', tmdbMovieId).limit(1).get();
+                let firestoreMovieId = null;
+
+                if (!existingMovieQuery.empty) {
+                    firestoreMovieId = existingMovieQuery.docs[0].id;
+                    console.log('Movie already exists in Firestore with ID:', firestoreMovieId);
+                    
+                    // If movie exists, and the current user has an interaction with it, load it
+                    // Simulate editing an existing movie from search result
+                    urlToEditId = firestoreMovieId; // Store this globally to trigger edit mode
+                    await checkEditMode(); // Call checkEditMode to load existing data
+                    showStatusMessage(`Movie already exists! Loading your personal details for "${movie.title}".`, 'info');
+                    
+                    // After checkEditMode, title, year etc. will be populated.
+                    // The form title and button text will also be set to 'Edit Movie'/'Update Movie'.
+                } else {
+                    console.log('Movie not yet in Firestore, preparing for new entry.');
+                    // If it's a new entry, clear previous edit context
+                    editingMovieId = null; 
+                    document.getElementById('formTitle').textContent = 'Add New Movie';
+                    document.getElementById('submitBtn').textContent = 'Add Movie';
+                    // Re-clear fields that checkEditMode might have set if it was called previously without a match
+                    // This is less critical now as checkEditMode is more guarded
+                }
+
+
                 document.getElementById('movieSearch').value = '';
                 document.getElementById('searchResults').innerHTML = '';
                 
-                showStatusMessage(`Details loaded for "${movie.title}"`, 'success');
+                // Show final alert after all processing
                 showAlertModal('Details Loaded', `Details for "${movie.title}" have been loaded into the form. You can now add your personal rating and notes!`);
 
             } catch (error) {

@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>tiny lizard</title>
+    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <!-- Optional: If you enabled Analytics -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-analytics-compat.js"></script> -->
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -183,8 +186,8 @@
             display: flex;
             gap: 15px;
             align-items: center;
-            margin-top: 15px; /* Added spacing from filter buttons */
-            justify-content: flex-end; /* Align to the right */
+            margin-top: 15px; 
+            justify-content: flex-end; 
         }
 
         .view-mode-btn {
@@ -221,6 +224,23 @@
             color: white;
             border-color: #007bff;
         }
+        
+        /* New style for "Add to My Collection" button */
+        .btn-add-to-collection {
+            background: #28a745; /* Green color */
+            color: white;
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+        .btn-add-to-collection:hover {
+            background: #218838;
+        }
+
 
         .movies-grid {
             display: grid;
@@ -535,6 +555,7 @@
                 <button class="filter-btn" data-filter="unwatched">Unwatched</button>
                 <button class="filter-btn" data-filter="favorites">5 Stars</button>
             </div>
+            
             <div class="view-mode-controls">
                 <button class="view-mode-btn active" data-view="my">My Movies</button>
                 <button class="view-mode-btn" data-view="all">All Movies</button>
@@ -550,6 +571,7 @@
         </div>
     </div>
 
+    
     <div id="confirmationModal" class="modal">
         <div class="modal-content">
             <h3 id="confirmationModalTitle">Confirm Action</h3>
@@ -575,7 +597,8 @@
         // Global variables
         let movies = []; 
         let currentUser = null; 
-        let currentViewMode = 'my'; // 'my' or 'all'
+        let currentViewMode = 'my'; 
+        let myInteractions = {}; // Store user's interactions keyed by movie ID (Firestore document ID)
 
         // --- Modal Functions ---
         function showConfirmationModal(title, message, onConfirm) {
@@ -636,7 +659,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupSearch();
             setupFilters();
-            setupViewModeControls(); // NEW: Setup view mode buttons
+            setupViewModeControls(); 
             setupLogout(); 
             
             // Listen for authentication state changes
@@ -646,7 +669,7 @@
                     currentUser = user;
                     userStatusDiv.textContent = `Logged in as: ${user.email}`;
                     console.log('User logged in:', user.email, 'UID:', user.uid);
-                    loadMoviesFromFirestore(currentViewMode); // Load movies based on current view mode
+                    loadMoviesFromFirestore(currentViewMode); 
                 } else {
                     currentUser = null;
                     userStatusDiv.textContent = 'Not logged in';
@@ -672,7 +695,7 @@
             });
         }
 
-        // --- View Mode Controls (NEW) ---
+        // --- View Mode Controls ---
         function setupViewModeControls() {
             const viewModeBtns = document.querySelectorAll('.view-mode-btn');
             viewModeBtns.forEach(btn => {
@@ -681,13 +704,13 @@
                     this.classList.add('active');
                     
                     currentViewMode = this.dataset.view;
-                    loadMoviesFromFirestore(currentViewMode); // Reload movies based on new view mode
+                    loadMoviesFromFirestore(currentViewMode); 
                 });
             });
         }
 
         // --- Firestore Integration (Loading and Deleting) ---
-        async function loadMoviesFromFirestore(viewMode) { // Now accepts viewMode
+        async function loadMoviesFromFirestore(viewMode) { 
             if (!currentUser) {
                 console.log("No user logged in, cannot load movies.");
                 movies = []; 
@@ -697,26 +720,72 @@
             }
 
             try {
-                let moviesRef = db.collection('movies'); 
+                // Step 1: Fetch all movies from the main 'movies' collection
+                const mainMoviesRef = db.collection('movies'); 
+                const snapshot = await mainMoviesRef.get(); 
                 
-                // NEW: Apply filter based on viewMode
-                if (viewMode === 'my') {
-                    moviesRef = moviesRef.where('userId', '==', currentUser.uid);
-                    console.log('Loading ONLY my movies...');
-                } else { // viewMode === 'all'
-                    console.log('Loading ALL movies (including others)...');
-                }
-
-                const snapshot = await moviesRef.get(); 
-                
-                movies = snapshot.docs.map(doc => ({
+                let allMovies = snapshot.docs.map(doc => ({
                     id: doc.id, 
                     ...doc.data() 
                 }));
-                
-                console.log("Movies loaded from Firestore:", movies);
-                displayMovies();
+                console.log("All main movies loaded from Firestore:", allMovies.length);
+
+                // Step 2: Fetch current user's interactions for all movies
+                myInteractions = {}; 
+                const interactionsRef = db.collection('users').doc(currentUser.uid).collection('movieInteractions');
+                const interactionsSnapshot = await interactionsRef.get();
+
+                interactionsSnapshot.docs.forEach(doc => {
+                    myInteractions[doc.id] = doc.data(); 
+                });
+                console.log("My interactions loaded:", Object.keys(myInteractions).length);
+
+                // Step 3: Combine main movie data with user's interaction data
+                let combinedMovies = allMovies.map(movie => {
+                    const interaction = myInteractions[movie.id];
+                    return {
+                        ...movie,
+                        myRating: interaction ? interaction.rating : 0, 
+                        myWatched: interaction ? interaction.watched : false, 
+                        myReview: interaction ? interaction.review : null,
+                        isInMyCollection: !!interaction 
+                    };
+                });
+                console.log("Combined all movies with my interactions:", combinedMovies.length);
+
+                // Step 4: Apply view mode filter: 'my' means only movies present in myInteractions
+                if (viewMode === 'my') {
+                    // Filter to only include movies for which the current user has an interaction record.
+                    movies = combinedMovies.filter(movie => movie.isInMyCollection); 
+                    console.log("Filtered for 'My Movies' view (based on interaction records):", movies.length);
+                } else { // viewMode === 'all'
+                    // Apply deduplication for 'All Movies' view
+                    // If multiple users added the same TMDB ID, prioritize the current user's version (if they have one)
+                    let uniqueMoviesMap = {}; 
+                    for (const movie of combinedMovies) {
+                        if (movie.tmdbId) { 
+                            // If TMDB ID not seen yet, or if current movie is in my collection, or if existing isn't owned by me, take current
+                            if (!uniqueMoviesMap[movie.tmdbId] || movie.isInMyCollection || (currentUser && uniqueMoviesMap[movie.tmdbId].originalUploaderId !== currentUser.uid)) {
+                                uniqueMoviesMap[movie.tmdbId] = movie;
+                            }
+                        } else {
+                            // For manually added movies without TMDB ID, they are treated as unique by their Firestore ID
+                            uniqueMoviesMap[movie.id] = movie;
+                        }
+                    }
+                    movies = Object.values(uniqueMoviesMap);
+                    console.log("Deduped movies for 'All Movies' view:", movies.length);
+                }
+
+
+                // Re-apply search and filter (from current active state) after loading and combining
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                const activeFilterButton = document.querySelector('.filter-btn.active');
+                const currentFilter = activeFilterButton ? activeFilterButton.dataset.filter : 'all';
+
+                displayMovies(searchTerm, currentFilter); 
                 updateStats();
+
             } catch (error) {
                 console.error('Error fetching movies from Firestore:', error);
                 showAlertModal('Error', 'Failed to load movies from database: ' + error.message);
@@ -746,7 +815,7 @@
             });
         }
 
-        // Display movies (remains largely the same, but 'id' is string from Firestore)
+        // Display movies 
         function displayMovies(searchTerm = '', filter = 'all') {
             const container = document.getElementById('moviesContainer');
             
@@ -763,13 +832,13 @@
             if (filter !== 'all') { 
                 switch(filter) {
                     case 'watched':
-                        filteredMovies = filteredMovies.filter(movie => movie.watched);
+                        filteredMovies = filteredMovies.filter(movie => movie.myWatched); 
                         break;
                     case 'unwatched':
-                        filteredMovies = filteredMovies.filter(movie => !movie.watched);
+                        filteredMovies = filteredMovies.filter(movie => !movie.myWatched); 
                         break;
                     case 'favorites':
-                        filteredMovies = filteredMovies.filter(movie => movie.rating === 5);
+                        filteredMovies = filteredMovies.filter(movie => movie.myRating === 5); 
                         break;
                 }
             }
@@ -789,40 +858,49 @@
                 return;
             }
 
-            const moviesHTML = filteredMovies.map(movie => `
-                <div class="movie-card">
-                    <div class="movie-poster">
-                        ${movie.posterUrl ? 
-                            `<img src="${movie.posterUrl}" alt="${movie.title} poster">` :
-                            `<div class="no-poster">No Poster</div>`
-                        }
-                    </div>
-                    <div class="movie-title">${movie.title}</div>
-                    ${movie.year ? `<div class="movie-year">${movie.year}</div>` : ''}
-                    
-                    ${movie.rating > 0 ? `
-                        <div class="movie-rating">
-                            ${generateStarDisplay(movie.rating)}
-                        </div>
-                    ` : ''}
-                    
-                    <div class="movie-status ${movie.watched ? 'watched' : 'unwatched'}">
-                        ${movie.watched ? '✓ Watched' : '○ Not Watched'}
-                    </div>
-                    
-                    <div class="movie-details">
-                        ${movie.director ? `<div><strong>Director:</strong> ${movie.director}</div>` : ''}
-                        ${movie.genre ? `<div><strong>Genre:</strong> ${movie.genre}</div>` : ''}
-                        ${movie.runtime ? `<div><strong>Runtime:</strong> ${movie.runtime} min</div>` : ''}
-                    </div>
-                    
-                    <div class="movie-actions">
-                        ${currentUser && movie.userId === currentUser.uid ? `
-                            <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
-                            <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
-                        ` : ''}
-                    </div>
-                </div>
+            // Inside displayMovies() function, within the moviesHTML.map(movie => `...`) template literal
+const moviesHTML = filteredMovies.map(movie => `
+    <div class="movie-card">
+        <div class="movie-poster">
+            ${movie.posterUrl ? 
+                `<img src="${movie.posterUrl}" alt="${movie.title} poster">` :
+                `<div class="no-poster">No Poster</div>`
+            }
+        </div>
+        <div class="movie-title">${movie.title}</div>
+        ${movie.year ? `<div class="movie-year">${movie.year}</div>` : ''}
+
+        ${movie.isInMyCollection && movie.myRating > 0 ? ` <!-- CHANGED: Only show if in my collection AND rated -->
+            <div class="movie-rating">
+                ${generateStarDisplay(movie.myRating)} 
+            </div>
+        ` : ''}
+
+        ${movie.isInMyCollection ? ` <!-- CHANGED: Only show status if in my collection -->
+            <div class="movie-status ${movie.myWatched ? 'watched' : 'unwatched'}"> 
+                ${movie.myWatched ? '✓ Watched' : '○ Not Watched'} 
+            </div>
+        ` : ''}
+
+        <div class="movie-details">
+            ${movie.director ? `<div><strong>Director:</strong> ${movie.director}</div>` : ''}
+            ${movie.genre ? `<div><strong>Genre:</strong> ${movie.genre}</div>` : ''}
+            ${movie.runtime ? `<div><strong>Runtime:</strong> ${movie.runtime} min</div>` : ''}
+            ${movie.isInMyCollection && movie.myReview ? `<div><strong>My Notes:</strong> ${movie.myReview.substring(0, 100)}${movie.myReview.length > 100 ? '...' : ''}</div>` : ''} <!-- CHANGED: Only show if in my collection -->
+        </div>
+
+        <div class="movie-actions">
+    ${currentUser && movie.isInMyCollection ? ` <!-- CHANGED: Show Edit/Delete if movie is in MY collection -->
+        <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
+        <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
+    ` : 
+    // "Add to List" button if not already in my collection
+    currentUser && !movie.isInMyCollection ? `
+        <button class="btn-add-to-collection" onclick="addMovieToList('${movie.id}')">Add to List</button>
+    ` : ''}
+        </div>
+    </div>
+
             `).join('');
 
             container.innerHTML = `<div class="movies-grid">${moviesHTML}</div>`;
@@ -838,14 +916,14 @@
 
         function updateStats() {
             const totalMovies = movies.length;
-            const watchedMovies = movies.filter(m => m.watched).length;
-            const ratedMovies = movies.filter(m => m.rating > 0);
+            const watchedMovies = movies.filter(m => m.myWatched).length; 
+            const ratedMovies = movies.filter(m => m.myRating > 0); 
             const avgRating = ratedMovies.length > 0 
-                ? (ratedMovies.reduce((sum, m) => sum + m.rating, 0) / ratedMovies.length).toFixed(1)
+                ? (ratedMovies.reduce((sum, m) => sum + m.myRating, 0) / ratedMovies.length).toFixed(1)
                 : '0.0';
             
             const totalHours = movies
-                .filter(m => m.watched && m.runtime)
+                .filter(m => m.myWatched && m.runtime) 
                 .reduce((sum, m) => sum + parseInt(m.runtime), 0);
             const hoursDisplay = Math.round(totalHours / 60);
 
@@ -860,7 +938,6 @@
                 showAlertModal('Authentication Required', 'You must be logged in to edit movies.');
                 return;
             }
-            // The check for ownership is performed in add-movie.html's checkEditMode.
             window.location.href = `add-movie.html?edit=${movieId}`;
         }
 
@@ -868,24 +945,81 @@
             showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your collection?', async (confirmed) => {
                 if (confirmed) {
                     try {
-                        // Crucially, check if the movie belongs to the current user before allowing delete
-                        const movieToDelete = movies.find(m => m.id === movieId);
-                        if (!currentUser || !movieToDelete || movieToDelete.userId !== currentUser.uid) {
-                            showAlertModal('Permission Denied', 'You can only delete movies you added.');
+                        if (!currentUser) {
+                            showAlertModal('Authentication Required', 'You must be logged in.');
                             return;
                         }
+
+                        const movieToDelete = movies.find(m => m.id === movieId);
+                        if (!movieToDelete) {
+                            showAlertModal('Error', 'Movie not found in your current list.');
+                            return;
+                        }
+
+                        if (movieToDelete.originalUploaderId === currentUser.uid) {
+                            // User is the original uploader: Delete the main movie document AND their interaction
+                            await db.collection('movies').doc(movieId).delete();
+                            await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
+                            showAlertModal('Success', 'Movie (and your personal data for it) deleted successfully!');
+                            console.log('Main movie document and user interaction deleted by original uploader.');
+                        } else {
+                            // User is NOT the original uploader: Only delete their personal interaction for this movie
+                            await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
+                            showAlertModal('Success', 'Your personal data (rating, watched, review) for this movie has been removed.');
+                            console.log('User interaction deleted (not original uploader).');
+                        }
                         
-                        await db.collection('movies').doc(movieId).delete(); 
-                        movies = movies.filter(m => m.id !== movieId); 
-                        displayMovies();
-                        updateStats();
-                        showAlertModal('Success', 'Movie deleted successfully!');
+                        loadMoviesFromFirestore(currentViewMode); 
+
                     } catch (error) {
-                        console.error('Error deleting movie from Firestore:', error);
-                        showAlertModal('Error', 'Failed to delete movie from database: ' + error.message);
+                        console.error('Error deleting movie/interaction from Firestore:', error);
+                        showAlertModal('Error', 'Failed to delete movie/interaction: ' + error.message);
                     }
                 }
             });
+        }
+
+        // NEW: Placeholder function for "Add to List"
+        async function addMovieToList(movieId) {
+            if (!currentUser) {
+                showAlertModal('Authentication Required', 'You must be logged in to add movies to a list.');
+                return;
+            }
+
+            const movieToAdd = movies.find(m => m.id === movieId);
+            if (!movieToAdd) {
+                showAlertModal('Error', 'Movie not found. Cannot add to list.');
+                return;
+            }
+
+            // This is the placeholder logic for now.
+            // In a future step, this would open a modal to select a list,
+            // or add to a default "Watchlist"
+            showAlertModal('Add to List', `"${movieToAdd.title}" added to a list! (Functionality to choose list coming soon.)`);
+            console.log(`Placeholder: Add movie ${movieId} ("${movieToAdd.title}") to a list.`);
+            
+            // For now, if you want it to behave like "Add to My Collection" (i.e., create an interaction)
+            // you can uncomment the following block, but it will then be in "My Movies"
+            /*
+            showConfirmationModal('Add to Collection', `Add "${movieToAdd.title}" to your personal collection?`, async (confirmed) => {
+                if (confirmed) {
+                    const userInteractionData = {
+                        rating: 0, 
+                        watched: false, 
+                        review: null, 
+                        interactionDate: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    await db.collection('users').doc(currentUser.uid)
+                            .collection('movieInteractions').doc(movieId)
+                            .set(userInteractionData); 
+
+                    showAlertModal('Success', `"${movieToAdd.title}" added to your collection!`, () => {
+                        loadMoviesFromFirestore(currentViewMode); 
+                    });
+                }
+            });
+            */
         }
     </script>
 </body>
