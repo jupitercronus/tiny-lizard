@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My DVD Collection</title>
+    <title>tiny lizard</title>
     <style>
         * {
             margin: 0;
@@ -188,6 +188,18 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         }
 
+        .movie-poster {
+            margin-bottom: 15px;
+        }
+
+        .movie-poster img {
+            width: 100%;
+            max-width: 200px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
         .movie-header {
             display: flex;
             justify-content: between;
@@ -332,6 +344,39 @@
         .search-result-item:hover {
             border-color: #667eea;
             transform: translateY(-2px);
+        }
+
+        .search-result-content {
+            display: flex;
+            gap: 15px;
+            align-items: start;
+        }
+
+        .search-result-poster {
+            width: 60px;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .search-result-no-poster {
+            width: 60px;
+            height: 90px;
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            color: #6c757d;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .search-result-info {
+            flex: 1;
         }
 
         .search-result-title {
@@ -524,8 +569,9 @@
         let currentRating = 0;
         
         // TMDb API configuration
-        const TMDB_API_KEY = 'demo_key'; // You'll need to get your own free API key
+        const TMDB_API_KEY = '3b3635a90ec6594d6682856b6669d20d';
         const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+        const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
         // Initialize the app when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -589,6 +635,7 @@
             const watched = document.getElementById('watched').value === 'true';
             const runtime = document.getElementById('runtime').value;
             const review = document.getElementById('review').value.trim();
+            const posterUrl = document.getElementById('movieForm').dataset.posterUrl || '';
 
             if (!title) {
                 alert('Please enter a movie title');
@@ -605,6 +652,7 @@
                 watched: watched,
                 runtime: runtime || '',
                 review: review || '',
+                posterUrl: posterUrl,
                 dateAdded: new Date().toLocaleDateString()
             };
 
@@ -616,6 +664,7 @@
 
         function clearForm() {
             document.getElementById('movieForm').reset();
+            document.getElementById('movieForm').removeAttribute('data-poster-url');
             currentRating = 0;
             updateStarDisplay();
         }
@@ -653,6 +702,11 @@
 
             const moviesHTML = filteredMovies.map(movie => `
                 <div class="movie-card">
+                    ${movie.posterUrl ? `
+                        <div class="movie-poster">
+                            <img src="${movie.posterUrl}" alt="${movie.title} poster">
+                        </div>
+                    ` : ''}
                     <div class="movie-header">
                         <div>
                             <div class="movie-title">${movie.title}</div>
@@ -760,11 +814,18 @@
                 searchResults.innerHTML = '<div class="loading">Searching movies...</div>';
 
                 try {
-                    // For demo purposes, we'll use a mock response
-                    // In real implementation, you'd call the TMDb API
-                    const mockResults = getMockSearchResults(query);
-                    displaySearchResults(mockResults);
+                    const response = await fetch(
+                        `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`
+                    );
+                    
+                    if (!response.ok) {
+                        throw new Error('Search failed');
+                    }
+                    
+                    const data = await response.json();
+                    displaySearchResults(data.results);
                 } catch (error) {
+                    console.error('Search error:', error);
                     searchResults.innerHTML = '<div class="loading">Error searching movies. Please try again.</div>';
                 }
             }
@@ -812,15 +873,24 @@
                     return;
                 }
 
-                const resultsHTML = results.map(movie => `
-                    <div class="search-result-item" onclick="selectMovie(${JSON.stringify(movie).replace(/"/g, '&quot;')})">
-                        <div class="search-result-title">${movie.title}</div>
-                        <div class="search-result-details">
-                            ${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown'} • 
-                            ${movie.director} • ${movie.genre}
-                            ${movie.runtime ? ` • ${movie.runtime} min` : ''}
+                const resultsHTML = results.slice(0, 10).map(movie => `
+                    <div class="search-result-item" onclick="selectMovieFromTMDb(${movie.id})">
+                        <div class="search-result-content">
+                            ${movie.poster_path ? `
+                                <img src="${TMDB_IMAGE_BASE}${movie.poster_path}" 
+                                     alt="${movie.title} poster" 
+                                     class="search-result-poster">
+                            ` : '<div class="search-result-no-poster">No Poster</div>'}
+                            <div class="search-result-info">
+                                <div class="search-result-title">${movie.title}</div>
+                                <div class="search-result-details">
+                                    ${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown Year'}
+                                </div>
+                                <div class="search-result-overview">
+                                    ${movie.overview ? movie.overview.substring(0, 150) + '...' : 'No description available'}
+                                </div>
+                            </div>
                         </div>
-                        <div class="search-result-overview">${movie.overview}</div>
                     </div>
                 `).join('');
 
@@ -828,20 +898,49 @@
             }
         }
 
-        // Select a movie from search results and populate the form
-        function selectMovie(movieData) {
-            document.getElementById('title').value = movieData.title;
-            document.getElementById('year').value = movieData.release_date ? new Date(movieData.release_date).getFullYear() : '';
-            document.getElementById('director').value = movieData.director || '';
-            document.getElementById('genre').value = movieData.genre || '';
-            document.getElementById('runtime').value = movieData.runtime || '';
-            
-            // Clear search results and input
-            document.getElementById('movieSearch').value = '';
-            document.getElementById('searchResults').innerHTML = '';
-            
-            // Scroll to form
-            document.getElementById('movieForm').scrollIntoView({ behavior: 'smooth' });
+        // Select a movie from TMDb search results and get full details
+        async function selectMovieFromTMDb(movieId) {
+            try {
+                // Get detailed movie information
+                const response = await fetch(
+                    `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=credits`
+                );
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch movie details');
+                }
+                
+                const movieData = await response.json();
+                
+                // Find director from credits
+                const director = movieData.credits?.crew?.find(person => person.job === 'Director')?.name || '';
+                
+                // Get genres
+                const genres = movieData.genres?.map(genre => genre.name).join(', ') || '';
+                
+                // Populate form fields
+                document.getElementById('title').value = movieData.title;
+                document.getElementById('year').value = movieData.release_date ? new Date(movieData.release_date).getFullYear() : '';
+                document.getElementById('director').value = director;
+                document.getElementById('genre').value = genres;
+                document.getElementById('runtime').value = movieData.runtime || '';
+                
+                // Store poster URL for later use
+                if (movieData.poster_path) {
+                    document.getElementById('movieForm').dataset.posterUrl = `${TMDB_IMAGE_BASE}${movieData.poster_path}`;
+                }
+                
+                // Clear search results and input
+                document.getElementById('movieSearch').value = '';
+                document.getElementById('searchResults').innerHTML = '';
+                
+                // Scroll to form
+                document.getElementById('movieForm').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                console.error('Error fetching movie details:', error);
+                alert('Error loading movie details. Please try again.');
+            }
         }
     </script>
 </body>
