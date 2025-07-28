@@ -214,6 +214,15 @@
                 <input type="text" id="movieSearch" placeholder="Type movie title to search...">
                 <button type="button" id="searchBtn" class="btn">Search</button>
                 <button type="button" id="cameraBtn" class="btn">Scan</button>
+                <button type="button" id="manualBarcodeBtn" class="btn">Enter Barcode</button>
+            </div>
+            
+            <div id="manualBarcodeInput" style="display: none; margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="barcodeInput" placeholder="Enter barcode manually (e.g., 123456789012)" pattern="[0-9]{8,13}">
+                    <button type="button" id="lookupBarcodeBtn" class="btn">Lookup</button>
+                    <button type="button" id="cancelBarcodeBtn" class="btn" style="background: #6c757d;">Cancel</button>
+                </div>
             </div>
             
             <div class="scanner-container" id="scannerContainer">
@@ -314,9 +323,49 @@
         function setupBarcodeScanner() {
             const cameraBtn = document.getElementById('cameraBtn');
             const stopBtn = document.getElementById('stopScanBtn');
+            const manualBtn = document.getElementById('manualBarcodeBtn');
+            const lookupBtn = document.getElementById('lookupBarcodeBtn');
+            const cancelBtn = document.getElementById('cancelBarcodeBtn');
             
             cameraBtn.addEventListener('click', startScanner);
             stopBtn.addEventListener('click', stopScanner);
+            manualBtn.addEventListener('click', showManualInput);
+            lookupBtn.addEventListener('click', lookupManualBarcode);
+            cancelBtn.addEventListener('click', hideManualInput);
+            
+            // Allow Enter key in barcode input
+            document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    lookupManualBarcode();
+                }
+            });
+        }
+
+        function showManualInput() {
+            document.getElementById('manualBarcodeInput').style.display = 'block';
+            document.getElementById('barcodeInput').focus();
+        }
+
+        function hideManualInput() {
+            document.getElementById('manualBarcodeInput').style.display = 'none';
+            document.getElementById('barcodeInput').value = '';
+        }
+
+        function lookupManualBarcode() {
+            const barcode = document.getElementById('barcodeInput').value.trim();
+            
+            if (!barcode) {
+                alert('Please enter a barcode');
+                return;
+            }
+            
+            if (!/^\d{8,13}$/.test(barcode)) {
+                alert('Please enter a valid barcode (8-13 digits)');
+                return;
+            }
+            
+            hideManualInput();
+            lookupMovieByBarcode(barcode);
         }
 
         async function startScanner() {
@@ -394,49 +443,96 @@
                     type: "LiveStream",
                     target: document.querySelector('#video'),
                     constraints: {
-                        width: 640,
-                        height: 480,
-                        facingMode: "environment"
+                        width: { ideal: 1280, min: 640 },
+                        height: { ideal: 720, min: 480 },
+                        facingMode: "environment",
+                        aspectRatio: { ideal: 16/9 }
                     }
                 },
                 locator: {
-                    patchSize: "medium",
-                    halfSample: true
+                    patchSize: "large",
+                    halfSample: false,
+                    showCanvas: true,
+                    showPatches: false,
+                    showFoundPatches: false,
+                    showSkeleton: false,
+                    showLabels: false,
+                    showPatchLabels: false,
+                    showRemainingPatchLabels: false,
+                    boxFromPatches: {
+                        showTransformed: true,
+                        showTransformedBox: true,
+                        showBB: true
+                    }
                 },
-                numOfWorkers: 2,
+                numOfWorkers: navigator.hardwareConcurrency || 4,
+                frequency: 10,
                 decoder: {
                     readers: [
                         "ean_reader",
-                        "ean_8_reader",
+                        "ean_8_reader", 
+                        "ean_13_reader",
                         "code_128_reader",
                         "code_39_reader",
-                        "code_39_vin_reader",
-                        "codabar_reader",
                         "upc_reader",
                         "upc_e_reader"
-                    ]
+                    ],
+                    debug: {
+                        drawBoundingBox: true,
+                        showFrequency: true,
+                        drawScanline: true,
+                        showPattern: true
+                    }
                 },
                 locate: true
             }, function(err) {
                 if (err) {
                     console.error('Quagga initialization failed:', err);
+                    document.getElementById('barcodeResult').innerHTML = `
+                        <p>❌ Scanner initialization failed. Try refreshing the page.</p>
+                    `;
                     return;
                 }
                 console.log("Quagga initialization finished. Ready to start");
                 Quagga.start();
+                
+                // Add scanning tips
+                document.getElementById('barcodeResult').innerHTML = `
+                    <p>📸 <strong>Scanning Tips:</strong></p>
+                    <ul style="text-align: left; margin: 10px 0;">
+                        <li>Hold the barcode 6-12 inches from camera</li>
+                        <li>Ensure good lighting</li>
+                        <li>Keep the barcode flat and steady</li>
+                        <li>Try different angles if it's not reading</li>
+                    </ul>
+                `;
             });
 
-            // Listen for successful barcode detection
+            // Listen for successful barcode detection with quality filtering
             Quagga.onDetected(function(result) {
                 const code = result.codeResult.code;
-                console.log('Barcode detected:', code);
+                const quality = result.codeResult.quality || 0;
                 
-                // Stop scanning after detection
-                Quagga.stop();
-                stopScanner();
+                console.log('Barcode detected:', code, 'Quality:', quality);
                 
-                // Look up movie by barcode
-                lookupMovieByBarcode(code);
+                // Only accept high-quality scans to reduce false positives
+                if (quality > 75) {
+                    // Stop scanning after detection
+                    Quagga.stop();
+                    stopScanner();
+                    
+                    // Look up movie by barcode
+                    lookupMovieByBarcode(code);
+                } else {
+                    console.log('Low quality scan, continuing...');
+                }
+            });
+
+            // Show detection attempts (optional, for debugging)
+            Quagga.onProcessed(function(result) {
+                if (result && result.codeResult && result.codeResult.code) {
+                    console.log('Processing attempt:', result.codeResult.code, 'Quality:', result.codeResult.quality);
+                }
             });
         }
 
