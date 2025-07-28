@@ -327,6 +327,86 @@
             display: inline-block;
         }
 
+        /* Modal Styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 25px;
+            border: 1px solid #888;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+            text-align: center;
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .modal-content p {
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        .modal-btn.confirm {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-btn.confirm:hover {
+            background: #c82333;
+        }
+
+        .modal-btn.cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .modal-btn.cancel:hover {
+            background: #5a6268;
+        }
+
+        .modal-btn.ok {
+            background: #007bff;
+            color: white;
+        }
+
+        .modal-btn.ok:hover {
+            background: #0056b3;
+        }
+
+
         @media (max-width: 768px) {
             .nav-container {
                 flex-direction: column;
@@ -419,9 +499,71 @@
         </div>
     </div>
 
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <h3 id="confirmationModalTitle">Confirm Action</h3>
+            <p id="confirmationModalMessage">Are you sure?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" id="confirmModalYes">Yes</button>
+                <button class="modal-btn cancel" id="confirmModalNo">No</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertModal" class="modal">
+        <div class="modal-content">
+            <h3 id="alertModalTitle">Alert</h3>
+            <p id="alertModalMessage">Something happened.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn ok" id="alertModalOk">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global variables
         let movies = JSON.parse(localStorage.getItem('tinyLizardMovies')) || [];
+
+        // --- Modal Functions ---
+        function showConfirmationModal(title, message, onConfirm) {
+            const modal = document.getElementById('confirmationModal');
+            document.getElementById('confirmationModalTitle').textContent = title;
+            document.getElementById('confirmationModalMessage').textContent = message;
+            modal.style.display = 'flex'; // Use flex to center content
+
+            const yesBtn = document.getElementById('confirmModalYes');
+            const noBtn = document.getElementById('confirmModalNo');
+
+            // Clear previous listeners to prevent multiple calls
+            yesBtn.onclick = null;
+            noBtn.onclick = null;
+
+            yesBtn.onclick = () => {
+                modal.style.display = 'none';
+                onConfirm(true);
+            };
+            noBtn.onclick = () => {
+                modal.style.display = 'none';
+                onConfirm(false);
+            };
+        }
+
+        function showAlertModal(title, message, onOk = () => {}) {
+            const modal = document.getElementById('alertModal');
+            document.getElementById('alertModalTitle').textContent = title;
+            document.getElementById('alertModalMessage').textContent = message;
+            modal.style.display = 'flex'; // Use flex to center content
+
+            const okBtn = document.getElementById('alertModalOk');
+
+            okBtn.onclick = null; // Clear previous listeners
+            okBtn.onclick = () => {
+                modal.style.display = 'none';
+                onOk();
+            };
+        }
+        // --- End Modal Functions ---
+
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {
@@ -569,17 +711,20 @@
 
         // Movie actions
         function editMovie(movieId) {
-            // For now, redirect to add page with edit parameter
+            // Redirect to add page with edit parameter
             window.location.href = `add-movie.html?edit=${movieId}`;
         }
 
         function deleteMovie(movieId) {
-            if (confirm('Are you sure you want to delete this movie from your collection?')) {
-                movies = movies.filter(m => m.id !== movieId);
-                localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
-                displayMovies();
-                updateStats();
-            }
+            showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your collection?', (confirmed) => {
+                if (confirmed) {
+                    movies = movies.filter(m => m.id !== movieId);
+                    localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
+                    displayMovies();
+                    updateStats();
+                    showAlertModal('Success', 'Movie deleted successfully!');
+                }
+            });
         }
 
         // Sync with localStorage when page becomes visible
