@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Movie - tiny lizard</title>
+    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -41,6 +44,7 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 16px;
+            box-sizing: border-box;
         }
         
         .form-row {
@@ -57,10 +61,16 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
+            transition: background-color 0.3s ease;
         }
         
         .btn:hover {
             background: #0056b3;
+        }
+        
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
         }
         
         .search-section {
@@ -68,6 +78,18 @@
             padding: 20px;
             border-radius: 5px;
             margin-bottom: 30px;
+        }
+        
+        .search-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .search-controls input {
+            flex: 1;
+            min-width: 200px;
         }
         
         .search-results {
@@ -86,6 +108,7 @@
             display: flex;
             gap: 15px;
             align-items: flex-start;
+            transition: background-color 0.3s ease;
         }
         
         .search-result:hover {
@@ -140,36 +163,42 @@
             font-size: 24px;
             color: #ddd;
             cursor: pointer;
+            transition: color 0.3s ease;
         }
         
         .star.active {
             color: #ffc107;
         }
         
-        .barcode-section {
-            background: #e8f5e8;
-            padding: 20px;
+        .star:hover {
+            color: #ffc107;
+        }
+        
+        .status-message {
+            padding: 10px;
             border-radius: 5px;
-            margin-bottom: 30px;
+            margin: 10px 0;
         }
         
-        .barcode-controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
+        .status-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
         }
         
-        #video {
-            width: 100%;
-            max-width: 400px;
-            height: 300px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            background: #000;
+        .status-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
         }
         
+        .status-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
         .scanner-container {
-            display: none;
             text-align: center;
             margin-top: 15px;
         }
@@ -179,40 +208,22 @@
             display: inline-block;
         }
         
-        .scan-line {
-            position: absolute;
-            top: 50%;
-            left: 10%;
-            right: 10%;
-            height: 2px;
-            background: #ff4444;
-            animation: scan 2s infinite;
-        }
-        
         @keyframes scan {
             0%, 100% { opacity: 0; }
             50% { opacity: 1; }
         }
-        
-        .barcode-result {
-            margin-top: 15px;
-            padding: 10px;
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 5px;
-        }
 
-        /* Modal Styles - Duplicated for add-movie.html (for simplicity in this example) */
+        /* Modal Styles */
         .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
+            display: none;
+            position: fixed;
+            z-index: 1000;
             left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
             justify-content: center;
             align-items: center;
         }
@@ -254,24 +265,6 @@
             transition: background-color 0.3s ease;
         }
 
-        .modal-btn.confirm {
-            background: #dc3545;
-            color: white;
-        }
-
-        .modal-btn.confirm:hover {
-            background: #c82333;
-        }
-
-        .modal-btn.cancel {
-            background: #6c757d;
-            color: white;
-        }
-
-        .modal-btn.cancel:hover {
-            background: #5a6268;
-        }
-
         .modal-btn.ok {
             background: #007bff;
             color: white;
@@ -303,21 +296,22 @@
                 </div>
             </div>
             
-            <div class="scanner-container" id="scannerContainer">
+            <div class="scanner-container" id="scannerContainer" style="display: none;">
                 <div class="scanner-overlay">
-                    <video id="video" autoplay></video>
-                    <div class="scan-line"></div> 
+                    <video id="video" autoplay style="width: 100%; max-width: 400px; height: 300px; border: 2px solid #ddd; border-radius: 5px; background: #000;"></video>
+                    <div class="scan-line" style="position: absolute; top: 50%; left: 10%; right: 10%; height: 2px; background: #ff4444; animation: scan 2s infinite;"></div> 
                 </div>
                 <button type="button" id="stopScanBtn" class="btn" style="margin-top: 10px;">Stop Camera</button>
             </div>
             
+            <div id="statusMessage"></div>
             <div id="barcodeResult"></div>
             <div id="searchResults"></div>
         </div>
         
         <hr>
         
-        <h3>✏️ Or Enter Manually</h3>
+        <h3>✏️ Movie Details</h3>
         <form id="movieForm">
             <div class="form-row">
                 <div class="form-group">
@@ -389,21 +383,37 @@
 
     <script>
         // Global variables
-        let movies = JSON.parse(localStorage.getItem('tinyLizardMovies')) || [];
+        let movies = []; // No longer initialized from localStorage, only used for editing logic
         let currentRating = 0;
         let editingMovieId = null; 
         
         // TMDb API configuration
-        const TMDB_API_KEY = '3b3635a90ec6594d6682856b6669d20d';
+        const TMDB_API_KEY = '3b3635a90ec6594d6682856b6669d20d'; 
         const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
         const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
-        // --- ZXing-JS specific variables ---
+        // ZXing-JS specific variables
         let codeReader = null;
         let videoInputDevices = [];
-        // --- End ZXing-JS specific variables ---
 
-        // --- Modal Functions ---
+        // --- Firebase Initialization ---
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+          apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
+          authDomain: "tiny-lizard.firebaseapp.com",
+          projectId: "tiny-lizard",
+          storageBucket: "tiny-lizard.firebasestorage.app",
+          messagingSenderId: "250872474692",
+          appId: "1:250872474692:web:969e0b1302ae3cb4666011",
+          measurementId: "G-43FM6WR90B"
+        };
+
+        // Initialize Firebase and get Firestore instance
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore(); // 'db' is your Firestore database instance
+        // --- End Firebase Initialization ---
+
+        // Modals
         function showAlertModal(title, message, onOk = () => {}) {
             const modal = document.getElementById('alertModal');
             document.getElementById('alertModalTitle').textContent = title;
@@ -418,30 +428,62 @@
                 onOk();
             };
         }
-        // --- End Modal Functions ---
 
+        // Utility functions for status messages
+        function showStatusMessage(message, type = 'info') {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            
+            if (type !== 'error') {
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+        
         // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() { 
+            console.log('Page loaded, initializing...');
+            
+            showStatusMessage('Attempting to connect to database...', 'info');
+            try {
+                // Perform a simple Firestore query to check connection and collection existence
+                const testDocRef = db.collection('movies').limit(1);
+                await testDocRef.get(); 
+                
+                console.log('✅ Database connection and initial collection access successful.');
+                showStatusMessage('Database connected successfully!', 'success');
+                
+            } catch (err) {
+                console.error('Initial DB connection test failed:', err);
+                showStatusMessage('Database connection failed: ' + err.message, 'error');
+                showAlertModal('DB Connection Error', 'Failed to connect to Firebase Firestore: ' + err.message + '. Please ensure your Firebase config is correct and Firestore rules allow access.');
+            }
+
             setupStarRating();
             setupForm();
             setupSearch();
-            setupBarcodeScanner();
-            checkEditMode(); 
+            await setupBarcodeScanner(); 
+            await checkEditMode(); 
+            
+            showStatusMessage('Ready!', 'success');
         });
 
         // Barcode scanner functionality
         async function setupBarcodeScanner() {
+            console.log('Setting up barcode scanner...');
+            
             const cameraBtn = document.getElementById('cameraBtn');
             const stopBtn = document.getElementById('stopScanBtn');
             const manualBtn = document.getElementById('manualBarcodeBtn');
             const lookupBtn = document.getElementById('lookupBarcodeBtn');
-            const cancelBtn = document.getElementById('cancelBarcodeBtn');
+            const cancelBtn = document.getElementById('cancelBarcodeBtn'); // Corrected variable name
             
             cameraBtn.addEventListener('click', startScanner);
             stopBtn.addEventListener('click', stopScanner);
             manualBtn.addEventListener('click', showManualInput);
             lookupBtn.addEventListener('click', lookupManualBarcode);
-            cancelBtn.addEventListener('click', hideManualInput);
+            cancelBtn.addEventListener('click', hideManualInput); // Use correct variable name
             
             document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
@@ -449,19 +491,31 @@
                 }
             });
 
-            codeReader = new ZXing.BrowserMultiFormatReader(); 
-            
             try {
-                videoInputDevices = await codeReader.listVideoInputDevices();
-                console.log('Video Input Devices:', videoInputDevices);
-                if (videoInputDevices.length === 0) {
+                if (typeof ZXing !== 'undefined' && ZXing.BrowserMultiFormatReader) {
+                    codeReader = new ZXing.BrowserMultiFormatReader(); 
+                    videoInputDevices = await codeReader.listVideoInputDevices();
+                    console.log('Video Input Devices:', videoInputDevices);
+                    
+                    if (videoInputDevices.length === 0) {
+                        cameraBtn.disabled = true; 
+                        cameraBtn.textContent = 'No Camera Found';
+                        console.log('No video input devices found');
+                    } else {
+                        cameraBtn.disabled = false; 
+                        console.log('Barcode scanner ready');
+                    }
+                } else {
+                    console.warn('ZXing library not loaded, barcode scanning disabled');
                     cameraBtn.disabled = true;
-                    showAlertModal('Camera Error', 'No video input devices found. Barcode scanning not possible.');
+                    cameraBtn.textContent = 'Scanner Unavailable';
+                    showAlertModal('Scanner Unavailable', 'The ZXing barcode scanning library could not be loaded. Please check your internet connection.');
                 }
             } catch (err) {
-                console.error('Error listing video input devices:', err);
-                cameraBtn.disabled = true;
-                showAlertModal('Camera Error', 'Could not access video input devices. Make sure you grant camera permissions.');
+                console.error('Error setting up barcode scanner:', err);
+                cameraBtn.disabled = true; 
+                cameraBtn.textContent = 'Scanner Error';
+                showAlertModal('Scanner Setup Error', 'An error occurred setting up the scanner: ' + err.message);
             }
         }
 
@@ -469,12 +523,18 @@
             document.getElementById('manualBarcodeInput').style.display = 'block';
             document.getElementById('barcodeInput').focus();
             document.getElementById('barcodeResult').innerHTML = ''; 
+            document.getElementById('cameraBtn').disabled = true; 
+            document.getElementById('searchBtn').disabled = true; 
+            showStatusMessage('Enter a barcode manually', 'info');
         }
 
         function hideManualInput() {
             document.getElementById('manualBarcodeInput').style.display = 'none';
             document.getElementById('barcodeInput').value = '';
             document.getElementById('barcodeResult').innerHTML = ''; 
+            document.getElementById('cameraBtn').disabled = false; 
+            document.getElementById('searchBtn').disabled = false; 
+            showStatusMessage('', 'info'); 
         }
 
         function lookupManualBarcode() {
@@ -491,7 +551,7 @@
             }
             
             hideManualInput(); 
-            lookupMovieByBarcode(barcode);
+            lookupMovieByBarcode(barcode); 
         }
 
         async function startScanner() {
@@ -501,43 +561,53 @@
             const barcodeResultDiv = document.getElementById('barcodeResult');
 
             if (!codeReader || videoInputDevices.length === 0) {
-                showAlertModal('Scanner Error', 'Scanner not initialized or no camera found.');
+                showAlertModal('Scanner Error', 'Scanner not initialized or no camera found. Try refreshing the page.');
+                cameraBtn.disabled = true; 
                 return;
             }
 
-            scannerContainer.style.display = 'block';
-            cameraBtn.textContent = 'Scanning...';
-            cameraBtn.disabled = true;
-            barcodeResultDiv.innerHTML = `
-                <p>📸 <strong>Scanning Tips:</strong></p>
-                <ul style="text-align: left; margin: 10px 0; list-style-position: inside;">
-                    <li>Ensure good lighting and hold barcode steady.</li>
-                    <li>The scanner automatically tries to find the barcode.</li>
-                    <li>Look for the red scan line as a visual cue.</li>
-                </ul>
-            `;
-
             try {
-                const selectedDeviceId = videoInputDevices[0].deviceId; 
+                scannerContainer.style.display = 'block';
+                cameraBtn.textContent = 'Scanning...';
+                cameraBtn.disabled = true; 
+                document.getElementById('searchBtn').disabled = true; 
+                document.getElementById('manualBarcodeBtn').disabled = true; 
+
+                showStatusMessage('Starting camera... Hold barcode steady in view.', 'info');
+
+                let selectedDeviceId = videoInputDevices[0].deviceId;
+                const environmentCamera = videoInputDevices.find(device => 
+                    device.label.toLowerCase().includes('back') || 
+                    device.label.toLowerCase().includes('environment')
+                );
+                if (environmentCamera) {
+                    selectedDeviceId = environmentCamera.deviceId;
+                } else if (videoInputDevices.length > 1) {
+                    selectedDeviceId = videoInputDevices[videoInputDevices.length - 1].deviceId; 
+                }
                 
-                console.log('Starting ZXing decodeFromVideoDevice...');
+                console.log('Starting ZXing scanner with device:', selectedDeviceId);
+                
+                video.srcObject = null; 
+
                 codeReader.decodeFromVideoDevice(selectedDeviceId, video, (result, err) => {
                     if (result) {
-                        console.log('ZXing Scan Result:', result.text);
+                        console.log('Barcode detected:', result.text);
                         stopScanner(); 
-                        lookupMovieByBarcode(result.text);
+                        lookupMovieByBarcode(result.text); 
                     }
                     if (err && !(err instanceof ZXing.NotFoundException)) {
-                        console.error('ZXing Scan Error:', err);
-                        barcodeResultDiv.innerHTML = `<p style="color: red;">Scanner Error: ${err.message}</p>`;
+                        console.error('Scanner error:', err);
+                        showStatusMessage('Scanner error: ' + err.message, 'error');
                         stopScanner(); 
                         showAlertModal('Scanner Error', `An error occurred during scanning: ${err.message}`);
                     }
                 });
+                
             } catch (err) {
-                console.error('Error starting ZXing scanner:', err);
-                showAlertModal('Camera Error', `Could not start camera: ${err.message}. Please check camera permissions and ensure no other app is using it.`);
-                stopScanner();
+                console.error('Error starting scanner:', err);
+                showAlertModal('Camera Error', 'Could not start camera: ' + err.message);
+                stopScanner(); 
             }
         }
 
@@ -550,108 +620,143 @@
                 codeReader.reset(); 
             }
             
-            video.srcObject = null;
+            video.srcObject = null; 
             scannerContainer.style.display = 'none';
             cameraBtn.textContent = 'Scan Barcode';
-            cameraBtn.disabled = false;
-            
+            cameraBtn.disabled = false; 
+            document.getElementById('searchBtn').disabled = false; 
+            document.getElementById('manualBarcodeBtn').disabled = false; 
+
             document.getElementById('barcodeResult').innerHTML = ''; 
+            showStatusMessage('Camera stopped', 'info');
         }
 
-        // Add a CORS proxy for UPC Item DB calls
         const CORS_PROXY_URL = 'https://cors-anywhere.herokuapp.com/'; 
 
         async function lookupMovieByBarcode(barcode) {
-            const resultDiv = document.getElementById('barcodeResult');
-            resultDiv.innerHTML = `<p>🔍 Looking up barcode: <strong>${barcode}</strong>...</p>`;
+            const barcodeResultDiv = document.getElementById('barcodeResult');
+            barcodeResultDiv.innerHTML = `<div class="status-message status-info">🔍 Looking up barcode: <strong>${barcode}</strong>...</div>`;
+            showStatusMessage(`Looking up barcode: ${barcode}...`, 'info');
             
             try {
+                let finalProxyUrl = CORS_PROXY_URL;
+                try {
+                    const proxyTestResponse = await fetch(CORS_PROXY_URL + 'https://example.com', { method: 'HEAD' });
+                    if (proxyTestResponse.status === 403) {
+                        showStatusMessage('CORS proxy needs access. Click "Request temporary access" here: <a href="https://cors-anywhere.herokuapp.com/" target="_blank" rel="noopener noreferrer">cors-anywhere.herokuapp.com</a> first, then retry.', 'error');
+                        throw new Error('CORS proxy access denied. Please allow it first.');
+                    }
+                } catch (proxyError) {
+                    console.warn('CORS proxy test failed (likely network issue to proxy):', proxyError);
+                    showStatusMessage('Could not reach CORS proxy. Check internet connection or try searching manually.', 'error');
+                    throw new Error('CORS proxy is unreachable. Check your internet connection.');
+                }
+
+
+                // Step 1: Look up the barcode in UPC database
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); 
 
-                const upcResponse = await fetch(`${CORS_PROXY_URL}https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`, { signal: controller.signal });
+                const upcResponse = await fetch(`${finalProxyUrl}https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`, { signal: controller.signal });
                 clearTimeout(timeoutId); 
 
                 if (!upcResponse.ok) {
+                    const errorText = await upcResponse.text();
                     if (upcResponse.status === 403) {
-                         throw new Error('UPC API access denied (403 Forbidden). You might be exceeding trial limits or your IP is blocked.');
+                         throw new Error(`UPC API access denied (403 Forbidden). You might be exceeding trial limits or your IP is blocked. Remember to visit ${CORS_PROXY_URL} and click "Request temporary access" first.`);
                     }
-                    throw new Error(`UPC lookup failed with status: ${upcResponse.status} ${upcResponse.statusText}`);
+                    throw new Error(`UPC lookup failed with status: ${upcResponse.status} ${errorText || upcResponse.statusText}`);
                 }
                 
                 const upcData = await upcResponse.json();
                 console.log("UPC Data:", upcData); 
                 
                 if (!upcData.items || upcData.items.length === 0) {
-                    resultDiv.innerHTML = `
-                        <p style="color: red;">❌ No product found for barcode: <strong>${barcode}</strong></p>
-                        <p>This might not be a movie DVD/Blu-ray, or it's not in the UPC database.</p>
-                        <p><em>Try searching manually by title, or enter details below!</em></p>
+                    barcodeResultDiv.innerHTML = `
+                        <div class="status-message status-error">
+                            <p>❌ No product found for barcode: <strong>${barcode}</strong></p>
+                            <p>This might not be a movie DVD/Blu-ray, or it's not in the UPC database.</p>
+                            <p><em>Please search manually by title or enter details below!</em></p>
+                        </div>
                     `;
-                    showAlertModal('Barcode Not Found', `No product found for barcode: ${barcode}. Try searching manually.`);
+                    showStatusMessage('No product found for this barcode.', 'error');
+                    showAlertModal('Barcode Not Found', `No product found for barcode: ${barcode}. Please search manually.`);
                     return;
                 }
                 
                 const product = upcData.items[0];
                 const productName = product.title || product.brand || 'Unknown Product';
                 
-                resultDiv.innerHTML = `
-                    <p>✅ Found product: <strong>${productName}</strong></p>
-                    <p>🎬 Searching TMDb for movie details...</p>
-                `;
+                barcodeResultDiv.innerHTML = `<div class="status-message status-info">✅ Found product: <strong>${productName}</strong><br>🎬 Searching TMDb for movie details...</div>`;
+                showStatusMessage(`Found product: ${productName}. Searching for movie...`, 'info');
                 
+                // Step 2: Extract movie title from product name
                 const movieTitle = extractMovieTitle(productName);
                 console.log('Extracted Movie Title for TMDb:', movieTitle); 
                 
+                // Step 3: Search TMDb for the movie
                 const tmdbResponse = await fetch(
                     `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(movieTitle)}`
                 );
                 
                 if (!tmdbResponse.ok) {
-                    throw new Error('Movie search failed');
+                    const errorText = await tmdbResponse.text();
+                    throw new Error(`Movie search failed: ${tmdbResponse.status} ${errorText || tmdbResponse.statusText}`);
                 }
                 
                 const tmdbData = await tmdbResponse.json();
                 console.log("TMDb Search Data:", tmdbData); 
                 
                 if (tmdbData.results.length === 0) {
-                    resultDiv.innerHTML = `
-                        <p>✅ Found product: <strong>${productName}</strong></p>
-                        <p style="color: red;">❌ No movie found on TMDb for: <strong>"${movieTitle}"</strong></p>
-                        <p>Try searching manually with a different title, or fill the form below.</p>
+                    barcodeResultDiv.innerHTML = `
+                        <div class="status-message status-error">
+                            <p>✅ Found product: <strong>${productName}</strong></p>
+                            <p>❌ No movie found on TMDb for: <strong>"${movieTitle}"</strong></p>
+                            <p><em>Try searching manually with a different title, or fill the form below.</em></p>
+                        </div>
                     `;
-                    
-                    document.getElementById('movieSearch').value = movieTitle;
+                    document.getElementById('movieSearch').value = movieTitle; 
+                    showStatusMessage(`No movie found for "${movieTitle}".`, 'error');
                     showAlertModal('Movie Not Found', `Found product "${productName}" but no movie match on TMDb for "${movieTitle}".`);
                     return;
                 }
                 
+                // Step 4: Auto-select the first movie result
                 const movie = tmdbData.results[0];
                 
-                resultDiv.innerHTML = `
-                    <p>✅ Found product: <strong>${productName}</strong></p>
-                    <p>🎬 Found movie: <strong>${movie.title}</strong> (${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown'})</p>
-                    <p>📝 Auto-filling form...</p>
+                barcodeResultDiv.innerHTML = `
+                    <div class="status-message status-info">
+                        <p>✅ Found product: <strong>${productName}</strong></p>
+                        <p>🎬 Found movie: <strong>${movie.title}</strong> (${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown'})</p>
+                        <p>📝 Auto-filling form...</p>
+                    </div>
                 `;
+                showStatusMessage(`Found movie: ${movie.title}. Auto-filling form...`, 'info');
                 
-                await selectMovie(movie.id);
+                await selectMovie(movie.id); 
                 
                 setTimeout(() => {
-                    resultDiv.innerHTML = `
-                        <p style="color: green;">🎉 <strong>Success!</strong> Found and loaded: <strong>${movie.title}</strong></p>
-                        <p>Review the details below and add your rating!</p>
+                    barcodeResultDiv.innerHTML = `
+                        <div class="status-message status-success">
+                            <p>🎉 <strong>Success!</strong> Found and loaded: <strong>${movie.title}</strong></p>
+                            <p>Review the details below and add your rating!</p>
+                        </div>
                     `;
+                    showStatusMessage(`Details for "${movie.title}" loaded!`, 'success');
                     showAlertModal('Movie Loaded!', `Successfully loaded details for "${movie.title}". Please review and save!`);
                 }, 1000);
                 
             } catch (error) {
                 console.error('Barcode lookup error:', error);
-                resultDiv.innerHTML = `
-                    <p style="color: red;">❌ Error looking up barcode: <strong>${barcode}</strong></p>
-                    <p>Details: ${error.message}</p>
-                    <p>This might be due to network issues, API rate limits, or the barcode not being in our databases.</p>
-                    <p><em>Try searching manually in the search box above!</em></p>
+                barcodeResultDiv.innerHTML = `
+                    <div class="status-message status-error">
+                        <p>❌ Error looking up barcode: <strong>${barcode}</strong></p>
+                        <p>Details: ${error.message}</p>
+                        <p>This might be due to network issues, API rate limits, or the barcode not being in our databases.</p>
+                        <p><em>Try searching manually in the search box above!</em></p>
+                    </div>
                 `;
+                showStatusMessage('Barcode lookup failed: ' + error.message, 'error');
                 showAlertModal('Lookup Error', `An error occurred while looking up barcode ${barcode}: ${error.message}. Please check your internet connection or try manual search.`);
             }
         }
@@ -659,33 +764,23 @@
         function extractMovieTitle(productName) {
             let title = productName;
             
-            // Remove common DVD/Blu-ray/format terms more robustly
             title = title.replace(/\b(DVD|Blu-ray|Blu ray|BD|4K|UHD|Digital|Copy|Widescreen|Full Screen|Anamorphic|Disc|Set|Collection)\b/gi, '');
             
-            // Remove edition information and common metadata in parentheses/brackets
-            // This is the most crucial part for "Burn After Reading (Spotlight Series) ("
-            title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); // Removes (anything in parentheses)
-            title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim(); // Removes [anything in brackets]
+            title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); 
+            title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim(); 
             
-            // Remove other common edition/series terms if they are not in parentheses
             title = title.replace(/\b(Special Edition|Director's Cut|Extended|Unrated|Collector's Edition|Limited Edition|Criterion|Series|Spotlight)\b/gi, '');
 
-            // Remove years that might sneak in if not in parentheses
             title = title.replace(/\s*\d{4}\s*/g, ' ').trim();
 
-            // Remove common punctuation/symbols that might interfere with search
             title = title.replace(/[™®©!@#$%^&*()_+={}\[\]:;"'<>,.?/~`|\\-]/g, ' ').trim();
 
-            // Remove extra whitespace (multiple spaces to single space)
             title = title.replace(/\s+/g, ' ').trim();
             
-            // Remove leading/trailing dashes or brackets (again, after other cleaning)
             title = title.replace(/^[-\[\(]+|[-\]\)]+$/g, '').trim();
 
-            // Final trim just in case
             title = title.trim();
             
-            // Fallback to original if cleaning resulted in empty string
             return title || productName; 
         }
 
@@ -697,13 +792,22 @@
                     currentRating = parseInt(this.dataset.rating);
                     updateStars();
                 });
+                
+                star.addEventListener('mouseenter', function() {
+                    const hoverRating = parseInt(this.dataset.rating);
+                    highlightStars(hoverRating);
+                });
+            });
+            
+            document.getElementById('starRating').addEventListener('mouseleave', function() {
+                updateStars(); 
             });
         }
 
-        function updateStars() {
+        function highlightStars(rating) {
             const stars = document.querySelectorAll('.star');
             stars.forEach((star, index) => {
-                if (index < currentRating) {
+                if (index < rating) {
                     star.classList.add('active');
                 } else {
                     star.classList.remove('active');
@@ -711,9 +815,18 @@
             });
         }
 
+        function updateStars() {
+            highlightStars(currentRating);
+        }
+
         function setupForm() {
-            document.getElementById('movieForm').addEventListener('submit', function(e) {
+            console.log('Setting up form...');
+            const form = document.getElementById('movieForm');
+            
+            form.addEventListener('submit', function(e) {
                 e.preventDefault();
+                console.log('Form submitted');
+                
                 if (editingMovieId) {
                     updateMovie();
                 } else {
@@ -722,62 +835,103 @@
             });
         }
 
-        function addMovie() {
-            const title = document.getElementById('title').value.trim();
+        async function addMovie() { 
+            console.log('Adding movie...');
+            const submitBtn = document.getElementById('submitBtn');
             
-            if (!title) {
-                showAlertModal('Validation Error', 'Please enter a movie title.');
-                return;
+            try {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Adding...';
+                showStatusMessage('Adding movie to database...', 'info'); 
+                
+                const title = document.getElementById('title').value.trim();
+                
+                if (!title) {
+                    showAlertModal('Validation Error', 'Please enter a movie title.');
+                    return;
+                }
+
+                const newMovie = {
+                    title: title,
+                    year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null, 
+                    director: document.getElementById('director').value.trim() || null, 
+                    genre: document.getElementById('genre').value.trim() || null,
+                    rating: currentRating || 0, 
+                    watched: document.getElementById('watched').value === 'true',
+                    runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null, 
+                    review: document.getElementById('review').value.trim() || null,
+                    posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
+                    dateAdded: new Date().toISOString() 
+                };
+
+                console.log('Inserting movie:', newMovie);
+
+                // Add a new document to the 'movies' collection
+                const docRef = await db.collection('movies').add(newMovie);
+                console.log("Document written with ID: ", docRef.id);
+                
+                showStatusMessage('Movie added successfully!', 'success');
+                showAlertModal('Success', 'Movie added successfully!', () => {
+                    clearForm();
+                    window.location.href = 'index.html'; 
+                });
+                
+            } catch (error) {
+                console.error('Unexpected error:', error);
+                showStatusMessage('Unexpected error: ' + error.message, 'error');
+                showAlertModal('Error', 'An unexpected error occurred: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Movie';
             }
-
-            const movie = {
-                id: Date.now(), 
-                title: title,
-                year: document.getElementById('year').value || '',
-                director: document.getElementById('director').value.trim() || '',
-                genre: document.getElementById('genre').value.trim() || '',
-                rating: currentRating,
-                watched: document.getElementById('watched').value === 'true',
-                runtime: document.getElementById('runtime').value || '',
-                review: document.getElementById('review').value.trim() || '',
-                posterUrl: document.getElementById('movieForm').dataset.posterUrl || '',
-                dateAdded: new Date().toLocaleDateString()
-            };
-
-            movies.push(movie);
-            localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
-            
-            showAlertModal('Success', 'Movie added successfully!', clearForm);
         }
 
-        function updateMovie() {
-            const title = document.getElementById('title').value.trim();
+        async function updateMovie() { 
+            console.log('Updating movie...');
+            const submitBtn = document.getElementById('submitBtn');
             
-            if (!title) {
-                showAlertModal('Validation Error', 'Please enter a movie title.');
-                return;
-            }
-
-            const movieIndex = movies.findIndex(m => m.id === editingMovieId);
-
-            if (movieIndex > -1) {
-                movies[movieIndex].title = title;
-                movies[movieIndex].year = document.getElementById('year').value || '';
-                movies[movieIndex].director = document.getElementById('director').value.trim() || '';
-                movies[movieIndex].genre = document.getElementById('genre').value.trim() || '';
-                movies[movieIndex].rating = currentRating;
-                movies[movieIndex].watched = document.getElementById('watched').value === 'true';
-                movies[movieIndex].runtime = document.getElementById('runtime').value || '';
-                movies[movieIndex].review = document.getElementById('review').value.trim() || '';
-                movies[movieIndex].posterUrl = document.getElementById('movieForm').dataset.posterUrl || movies[movieIndex].posterUrl || ''; 
+            try {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Updating...';
+                showStatusMessage('Updating movie in database...', 'info'); 
                 
-                localStorage.setItem('tinyLizardMovies', JSON.stringify(movies));
+                const title = document.getElementById('title').value.trim();
                 
+                if (!title) {
+                    showAlertModal('Validation Error', 'Please enter a movie title.');
+                    return;
+                }
+
+                const updatedMovie = {
+                    title: title,
+                    year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null,
+                    director: document.getElementById('director').value.trim() || null,
+                    genre: document.getElementById('genre').value.trim() || null,
+                    rating: currentRating || 0,
+                    watched: document.getElementById('watched').value === 'true',
+                    runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null,
+                    review: document.getElementById('review').value.trim() || null,
+                    posterUrl: document.getElementById('movieForm').dataset.posterUrl || null, 
+                };
+
+                console.log('Updating movie:', updatedMovie);
+
+                // Update an existing document by its ID
+                await db.collection('movies').doc(editingMovieId).update(updatedMovie);
+
+                console.log('Movie updated successfully!');
+                showStatusMessage('Movie updated successfully!', 'success');
                 showAlertModal('Success', 'Movie updated successfully!', () => {
                     window.location.href = 'index.html'; 
                 });
-            } else {
-                showAlertModal('Error', 'Movie not found for update.');
+                
+            } catch (error) {
+                console.error('Unexpected error:', error);
+                showStatusMessage('Unexpected error: ' + error.message, 'error');
+                showAlertModal('Error', 'An unexpected error occurred: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update Movie';
             }
         }
 
@@ -789,46 +943,68 @@
             editingMovieId = null; 
             document.getElementById('formTitle').textContent = 'Add New Movie';
             document.getElementById('submitBtn').textContent = 'Add Movie';
-            document.getElementById('barcodeResult').innerHTML = ''; 
+            document.getElementById('statusMessage').innerHTML = '';
         }
 
-        function checkEditMode() {
+        // --- Edit Mode Functionality ---
+        async function checkEditMode() { 
+            console.log('Checking edit mode...');
             const urlParams = new URLSearchParams(window.location.search);
             const movieId = urlParams.get('edit');
 
             if (movieId) {
-                editingMovieId = parseInt(movieId);
-                const movieToEdit = movies.find(m => m.id === editingMovieId);
+                editingMovieId = movieId; 
+                document.getElementById('formTitle').textContent = 'Loading Movie for Edit...';
+                showStatusMessage('Loading movie for editing...', 'info');
 
-                if (movieToEdit) {
-                    document.getElementById('formTitle').textContent = 'Edit Movie';
-                    document.getElementById('submitBtn').textContent = 'Update Movie';
+                try {
+                    // Fetch a single document by its ID
+                    const doc = await db.collection('movies').doc(movieId).get();
 
-                    document.getElementById('title').value = movieToEdit.title;
-                    document.getElementById('year').value = movieToEdit.year;
-                    document.getElementById('director').value = movieToEdit.director;
-                    document.getElementById('genre').value = movieToEdit.genre;
-                    
-                    currentRating = movieToEdit.rating;
-                    updateStars();
-                    
-                    document.getElementById('watched').value = movieToEdit.watched ? 'true' : 'false';
-                    document.getElementById('runtime').value = movieToEdit.runtime;
-                    document.getElementById('review').value = movieToEdit.review;
-                    
-                    if (movieToEdit.posterUrl) {
-                        document.getElementById('movieForm').dataset.posterUrl = movieToEdit.posterUrl;
+                    if (!doc.exists) {
+                        console.error('Error: Movie not found for editing with ID:', movieId);
+                        showStatusMessage('Movie not found for editing', 'error');
+                        showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
+                        clearForm(); 
                     } else {
-                        document.getElementById('movieForm').removeAttribute('data-poster-url');
+                        const movieToEdit = doc.data();
+                        console.log('Loaded movie for editing:', movieToEdit);
+                        
+                        document.getElementById('formTitle').textContent = 'Edit Movie';
+                        document.getElementById('submitBtn').textContent = 'Update Movie';
+
+                        document.getElementById('title').value = movieToEdit.title || '';
+                        document.getElementById('year').value = movieToEdit.year || '';
+                        document.getElementById('director').value = movieToEdit.director || '';
+                        document.getElementById('genre').value = movieToEdit.genre || '';
+                        
+                        currentRating = movieToEdit.rating || 0;
+                        updateStars();
+                        
+                        document.getElementById('watched').value = movieToEdit.watched ? 'true' : 'false';
+                        document.getElementById('runtime').value = movieToEdit.runtime || '';
+                        document.getElementById('review').value = movieToEdit.review || '';
+                        
+                        if (movieToEdit.posterUrl) {
+                            document.getElementById('movieForm').dataset.posterUrl = movieToEdit.posterUrl;
+                        } else {
+                            document.getElementById('movieForm').removeAttribute('data-poster-url');
+                        }
+                        
+                        showStatusMessage('Movie loaded for editing', 'success');
                     }
-                } else {
-                    showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
-                    clearForm(); 
+                } catch (error) {
+                    console.error('Unexpected error loading movie:', error);
+                    showStatusMessage('Unexpected error loading movie: ' + error.message, 'error');
+                    showAlertModal('Error', 'An unexpected error occurred while loading the movie.');
+                    clearForm();
                 }
             }
         }
 
+        // --- Movie Search Functionality ---
         function setupSearch() {
+            console.log('Setting up search...');
             const searchBtn = document.getElementById('searchBtn');
             const searchInput = document.getElementById('movieSearch');
             
@@ -843,93 +1019,154 @@
         async function performSearch() {
             const query = document.getElementById('movieSearch').value.trim();
             const resultsDiv = document.getElementById('searchResults');
+            const searchBtn = document.getElementById('searchBtn');
             
             if (!query) {
-                resultsDiv.innerHTML = '<p>Please enter a search query.</p>';
+                showStatusMessage('Please enter a search query.', 'error');
                 return;
             }
             
-            resultsDiv.innerHTML = '<p>Searching...</p>';
-            
             try {
-                const response = await fetch(
-                    `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`
-                );
+                searchBtn.disabled = true;
+                searchBtn.textContent = 'Searching...';
+                showStatusMessage('Searching for movies...', 'info');
+                resultsDiv.innerHTML = '<p>Searching...</p>';
+                
+                console.log('Searching for:', query);
+                
+                const searchUrl = `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`;
+                console.log('TMDb search URL:', searchUrl);
+                
+                const response = await fetch(searchUrl);
+                
+                console.log('TMDb response status:', response.status, response.statusText);
                 
                 if (!response.ok) {
-                    throw new Error('Search failed');
+                    throw new Error(`TMDb API error: ${response.status} ${response.statusText}`);
                 }
                 
-                const data = response.json();
-                displayResults(data.results);
+                const data = await response.json(); 
+                console.log("TMDb search results:", data); 
+                
+                if (data && data.results) { 
+                    displayResults(data.results);
+                    showStatusMessage(`Found ${data.results.length} movies`, 'success');
+                } else {
+                    console.error('Unexpected response format or no results array:', data);
+                    throw new Error('Unexpected response format from TMDb API or no "results" array.');
+                }
                 
             } catch (error) {
                 console.error('Search error:', error);
-                resultsDiv.innerHTML = '<p style="color: red;">Error searching movies. Please try again.</p>';
-                showAlertModal('Search Error', 'Failed to search for movies. Please check your internet connection or TMDb API key.');
+                showStatusMessage('Error searching movies: ' + error.message, 'error');
+                resultsDiv.innerHTML = `
+                    <div class="status-message status-error">
+                        <p>❌ Error searching movies: ${error.message}</p>
+                        <p>This might be due to:</p>
+                        <ul style="text-align: left; margin: 10px 0;">
+                            <li>Network connectivity issues</li>
+                            <li>TMDb API service down</li>
+                            <li>Invalid API key</li>
+                            <li>Rate limiting</li>
+                        </ul>
+                        <p>Try again in a few moments.</p>
+                    </div>
+                `;
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.textContent = 'Search';
             }
         }
 
         function displayResults(results) {
             const resultsDiv = document.getElementById('searchResults');
             
-            if (results.length === 0) {
+            console.log('Displaying results:', results);
+            
+            if (!results || results.length === 0) { 
                 resultsDiv.innerHTML = '<p>No movies found for your search.</p>';
                 return;
             }
             
-            const html = results.slice(0, 10).map(movie => `
-                <div class="search-result" onclick="selectMovie(${movie.id})">
-                    ${movie.poster_path ? 
-                        `<img src="${TMDB_IMAGE_BASE}${movie.poster_path}" alt="${movie.title} poster">` :
-                        `<div class="no-poster">No Poster</div>`
-                    }
-                    <div class="search-result-info">
-                        <h4>${movie.title}</h4>
-                        <p>${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown Year'}</p>
-                        <p>${movie.overview ? movie.overview.substring(0, 100) + '...' : 'No description'}</p>
-                    </div>
-                </div>
-            `).join('');
-            
-            resultsDiv.innerHTML = html;
+            try {
+                const html = results.slice(0, 10).map((movie, index) => {
+                    console.log(`Processing movie ${index}:`, movie);
+                    
+                    return `
+                        <div class="search-result" onclick="selectMovie(${movie.id})" style="cursor: pointer;">
+                            ${movie.poster_path ? 
+                                `<img src="${TMDB_IMAGE_BASE}${movie.poster_path}" alt="${movie.title} poster" class="search-result-poster">` :
+                                `<div class="no-poster">No Poster</div>`
+                            }
+                            <div class="search-result-info">
+                                <h4>${movie.title || 'Unknown Title'}</h4>
+                                <p><strong>Year:</strong> ${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown Year'}</p>
+                                <p><strong>Overview:</strong> ${movie.overview ? movie.overview.substring(0, 150) + '...' : 'No description available'}</p>
+                                ${movie.vote_average ? `<p><strong>Rating:</strong> ${movie.vote_average}/10</p>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                resultsDiv.innerHTML = html;
+                console.log('Results displayed successfully');
+                
+            } catch (error) {
+                console.error('Error displaying results:', error);
+                resultsDiv.innerHTML = `<p style="color: red;">Error displaying search results: ${error.message}</p>`;
+            }
         }
 
         async function selectMovie(movieId) {
             try {
-                const response = await fetch(
-                    `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=credits`
-                );
+                showStatusMessage('Loading movie details...', 'info');
+                console.log('Selecting movie ID:', movieId);
+                
+                const detailsUrl = `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
+                console.log('TMDb details URL:', detailsUrl);
+                
+                const response = await fetch(detailsUrl);
+                
+                console.log('TMDb details response status:', response.status, response.statusText);
                 
                 if (!response.ok) {
-                    throw new Error('Failed to fetch movie details');
+                    throw new Error(`Failed to fetch movie details: ${response.status} ${response.statusText}`);
                 }
                 
                 const movie = await response.json();
+                console.log('Movie details received:', movie);
                 
                 const director = movie.credits?.crew?.find(person => person.job === 'Director')?.name || '';
                 const genres = movie.genres?.map(genre => genre.name).join(', ') || '';
                 
-                document.getElementById('title').value = movie.title;
+                console.log('Extracted director:', director);
+                console.log('Extracted genres:', genres);
+                
+                document.getElementById('title').value = movie.title || '';
                 document.getElementById('year').value = movie.release_date ? new Date(movie.release_date).getFullYear() : '';
                 document.getElementById('director').value = director;
                 document.getElementById('genre').value = genres;
                 document.getElementById('runtime').value = movie.runtime || '';
                 
                 if (movie.poster_path) {
-                    document.getElementById('movieForm').dataset.posterUrl = `${TMDB_IMAGE_BASE}${movie.poster_path}`;
+                    const posterUrl = `${TMDB_IMAGE_BASE}${movie.poster_path}`;
+                    document.getElementById('movieForm').dataset.posterUrl = posterUrl;
+                    console.log('Poster URL set:', posterUrl);
                 } else {
                     document.getElementById('movieForm').removeAttribute('data-poster-url'); 
+                    console.log('No poster available');
                 }
                 
                 document.getElementById('movieSearch').value = '';
                 document.getElementById('searchResults').innerHTML = '';
                 
-                showAlertModal('Details Loaded', `Details for "${movie.title}" loaded into the form.`);
+                showStatusMessage(`Details loaded for "${movie.title}"`, 'success');
+                showAlertModal('Details Loaded', `Details for "${movie.title}" have been loaded into the form. You can now add your personal rating and notes!`);
 
             } catch (error) {
                 console.error('Error selecting movie:', error);
-                showAlertModal('Error', 'Error loading movie details from TMDb. Please try again.');
+                showStatusMessage('Error loading movie details: ' + error.message, 'error');
+                showAlertModal('Error', 'Error loading movie details. Please try again or fill in the details manually.');
             }
         }
     </script>
