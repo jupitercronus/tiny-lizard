@@ -1,8 +1,13 @@
 {
+    "functions": {
+      "api/tmdb.js": {
+        "maxDuration": 10
+      }
+    },
     "rewrites": [
       {
-        "source": "/api/(.*)",
-        "destination": "/api"
+        "source": "/api/tmdb/(.*)",
+        "destination": "/api/tmdb"
       }
     ]
   }
