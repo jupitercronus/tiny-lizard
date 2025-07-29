@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Movie - tiny lizard</title>
+    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
@@ -347,7 +348,9 @@
         <div class="nav-container">
             <a href="index.html" class="logo">tiny lizard</a>
             <div class="nav-links">
-                <a href="index.html" class="nav-link">Home</a> <button id="logoutBtn" class="logout-btn">Logout</button> </div>
+                <a href="index.html" class="nav-link">Home</a> <!-- NEW HOME BUTTON -->
+                <button id="logoutBtn" class="logout-btn">Logout</button> <!-- NEW LOGOUT BUTTON -->
+            </div>
         </div>
     </nav>
 
@@ -435,6 +438,18 @@
                 </div>
             </div>
             
+            <!-- UPDATED FIELD LABELS AND IDs -->
+            <div class="form-group">
+                <label for="summary">Summary</label> <!-- Renamed from overview -->
+                <textarea id="summary" rows="6" placeholder="Movie summary from TMDb"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="cast">Cast</label> <!-- Renamed from top billed cast -->
+                <input type="text" id="cast" placeholder="e.g., Leonardo DiCaprio, Joseph Gordon-Levitt">
+            </div>
+            <!-- END UPDATED FIELDS -->
+
             <div class="form-group">
                 <label for="review">Review/Notes</label>
                 <textarea id="review" rows="4" placeholder="What did you think of this movie?"></textarea>
@@ -467,6 +482,10 @@
         const TMDB_API_KEY = '3b3635a90ec6594d6682856b6669d20d'; 
         const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
         const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+
+        // NEW: Global variables to store additional TMDb data
+        let selectedMovieOverview = null; // Still use 'overview' here as it comes from TMDb
+        let selectedMovieCast = []; // Still use 'cast' here as it comes from TMDb
 
         // ZXing-JS specific variables
         let codeReader = null;
@@ -970,28 +989,46 @@
                     genre: document.getElementById('genre').value.trim() || null,
                     posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
                     runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null, 
-                    tmdbId: document.getElementById('movieForm').dataset.tmdbId ? parseInt(document.getElementById('movieForm').dataset.tmdbId) : null, // NEW: TMDb ID
+                    tmdbId: document.getElementById('movieForm').dataset.tmdbId ? parseInt(document.getElementById('movieForm').dataset.tmdbId) : null,
                     dateAdded: firebase.firestore.FieldValue.serverTimestamp(), 
-                    originalUploaderId: currentUser.uid // NEW: Store who originally uploaded this movie to public list
+                    originalUploaderId: currentUser.uid, 
+                    overview: document.getElementById('summary').value.trim() || null, // UPDATED: Get from 'summary'
+                    cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null 
                 };
 
                 // Data for the user's personal 'movieInteractions' subcollection
                 const userInteractionData = {
-                    rating: currentRating || 0,
-                    watched: document.getElementById('watched').value === 'true', // <<< THIS LINE
+                    rating: currentRating || 0, 
+                    watched: document.getElementById('watched').value === 'true', 
                     review: document.getElementById('review').value.trim() || null,
-                    interactionDate: firebase.firestore.FieldValue.serverTimestamp()
+                    interactionDate: firebase.firestore.FieldValue.serverTimestamp() 
                 };
 
-                // Step 1: Add the main movie document to the 'movies' collection
-                const movieDocRef = await db.collection('movies').add(mainMovieData);
-                console.log("Main movie document written with ID: ", movieDocRef.id);
+                // Step 1: Check if a movie with this TMDb ID already exists in the main 'movies' collection
+                let movieDocRef;
+                if (mainMovieData.tmdbId) {
+                    const existingMovieQuery = await db.collection('movies').where('tmdbId', '==', mainMovieData.tmdbId).limit(1).get();
+                    if (!existingMovieQuery.empty) {
+                        movieDocRef = existingMovieQuery.docs[0].ref;
+                        console.log("Movie with TMDb ID already exists. Using existing document:", movieDocRef.id);
+                        // Optionally update main movie data if current user is original uploader
+                        if (existingMovieQuery.docs[0].data().originalUploaderId === currentUser.uid) {
+                            await movieDocRef.update(mainMovieData); // Update existing main movie data
+                            console.log("Original uploader updated main movie data.");
+                        }
+                    }
+                }
 
-                // Step 2: Add the user's interaction data to their specific subcollection
-                // The movieId for the interaction will be the ID of the newly created main movie document
+                // If movieDocRef is not set (meaning it's a truly new movie or no tmdbId), add it
+                if (!movieDocRef) {
+                    movieDocRef = await db.collection('movies').add(mainMovieData);
+                    console.log("New main movie document written with ID: ", movieDocRef.id);
+                }
+                
+                // Step 2: Add/update the user's interaction data in their specific subcollection
                 await db.collection('users').doc(currentUser.uid)
-                        .collection('movieInteractions').doc(movieDocRef.id) // Use the same ID as the main movie
-                        .set(userInteractionData); // Use .set() here to create or overwrite
+                        .collection('movieInteractions').doc(movieDocRef.id) 
+                        .set(userInteractionData, { merge: true }); // Use .set() with merge to create or overwrite
 
                 console.log('Movie and user interaction added successfully!');
                 showStatusMessage('Movie added successfully!', 'success');
@@ -1039,7 +1076,8 @@
                     genre: document.getElementById('genre').value.trim() || null,
                     posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
                     runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null,
-                    // Do NOT update tmdbId or dateAdded here, only on initial add
+                    overview: document.getElementById('summary').value.trim() || null, // UPDATED: Get from 'summary'
+                    cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null 
                 };
 
                 // Data for updating the user's personal 'movieInteractions' subcollection
@@ -1060,16 +1098,15 @@
                 // Step 1: Update the main movie document (only if current user is original uploader)
                 if (existingMovieData.originalUploaderId === currentUser.uid) {
                     await db.collection('movies').doc(editingMovieId).update(mainMovieUpdates);
-                    console.log('Main movie document updated!');
+                    console.log('Main movie document updated by original uploader.');
                 } else {
                     console.log('Not original uploader, skipping main movie update.');
-                    // Optionally, you could show a message here that only personal details are being saved
                 }
 
                 // Step 2: Update the user's interaction data in their subcollection
                 await db.collection('users').doc(currentUser.uid)
                         .collection('movieInteractions').doc(editingMovieId)
-                        .set(userInteractionUpdates, { merge: true }); // Use {merge: true} to only update specified fields
+                        .set(userInteractionUpdates, { merge: true }); 
 
                 console.log('Movie and user interaction updated successfully!');
                 showStatusMessage('Movie updated successfully!', 'success');
@@ -1090,13 +1127,17 @@
         function clearForm() {
             document.getElementById('movieForm').reset();
             document.getElementById('movieForm').removeAttribute('data-poster-url');
-            document.getElementById('movieForm').removeAttribute('data-tmdb-id'); // Clear tmdbId too
+            document.getElementById('movieForm').removeAttribute('data-tmdb-id'); 
             currentRating = 0;
             updateStars();
             editingMovieId = null; 
             document.getElementById('formTitle').textContent = 'Add New Movie';
             document.getElementById('submitBtn').textContent = 'Add Movie';
             document.getElementById('statusMessage').innerHTML = '';
+            selectedMovieOverview = null; // Clear global overview
+            selectedMovieCast = []; // Clear global cast
+            document.getElementById('summary').value = ''; // Clear summary field
+            document.getElementById('cast').value = ''; // Clear cast field
         }
 
         async function checkEditMode() { 
@@ -1108,11 +1149,11 @@
                 console.log("No user logged in, cannot check edit mode.");
                 return;
             }
-            if (!movieId) { // If no movieId provided, just return
+            if (!movieId) { 
                 return;
             }
 
-            editingMovieId = movieId; // Store the Firestore doc ID
+            editingMovieId = movieId; 
 
             document.getElementById('formTitle').textContent = 'Loading Movie for Edit...';
             showStatusMessage('Loading movie for editing...', 'info');
@@ -1140,7 +1181,18 @@
                     console.log('User-specific interaction data loaded:', userInteractionData);
                 } else {
                     console.log('No existing user-specific interaction data for this movie. Will use defaults/empty.');
+                    // If no interaction data, and we're in edit mode, it means user clicked "Add to My Movies"
+                    // So we should initialize defaults for the form.
+                    userInteractionData = {
+                        rating: 0,
+                        watched: false,
+                        review: null
+                    };
                 }
+
+                // Store loaded overview and cast into global variables for updateMovie to use
+                selectedMovieOverview = mainMovieData.overview || null;
+                selectedMovieCast = mainMovieData.cast || [];
 
                 // Populate the form with main movie data
                 document.getElementById('title').value = mainMovieData.title || '';
@@ -1149,6 +1201,10 @@
                 document.getElementById('genre').value = mainMovieData.genre || '';
                 document.getElementById('runtime').value = mainMovieData.runtime || '';
                 
+                // NEW: Populate Summary and Cast fields directly from mainMovieData
+                document.getElementById('summary').value = mainMovieData.overview || ''; // Populating 'summary' from 'overview'
+                document.getElementById('cast').value = (mainMovieData.cast && Array.isArray(mainMovieData.cast)) ? mainMovieData.cast.join(', ') : '';
+
                 // Set poster URL and TMDb ID
                 if (mainMovieData.posterUrl) {
                     document.getElementById('movieForm').dataset.posterUrl = mainMovieData.posterUrl;
@@ -1179,8 +1235,7 @@
             }
         }
         
-        // This is a global variable to pass TMDB ID from barcode/search to checkEditMode directly
-        let urlToEditId = null;
+        let urlToEditId = null; // Global variable to pass Firestore ID from search/barcode to checkEditMode
 
         // --- Movie Search Functionality ---
         function setupSearch() {
@@ -1297,7 +1352,7 @@
             }
         }
 
-        async function selectMovie(tmdbMovieId) { // Renamed parameter to clarify it's TMDb ID
+        async function selectMovie(tmdbMovieId) { 
             try {
                 showStatusMessage('Loading movie details...', 'info');
                 console.log('Selecting movie ID:', tmdbMovieId);
@@ -1316,6 +1371,14 @@
                 const movie = await response.json();
                 console.log('Movie details received:', movie);
                 
+                // Extract overview
+                selectedMovieOverview = movie.overview || null; 
+                console.log('Extracted overview:', selectedMovieOverview);
+
+                // Extract top billed cast (e.g., first 3 actors)
+                selectedMovieCast = movie.credits?.cast?.slice(0, 3).map(person => person.name) || [];
+                console.log('Extracted cast:', selectedMovieCast);
+
                 const director = movie.credits?.crew?.find(person => person.job === 'Director')?.name || '';
                 const genres = movie.genres?.map(genre => genre.name).join(', ') || '';
                 
@@ -1328,6 +1391,10 @@
                 document.getElementById('genre').value = genres;
                 document.getElementById('runtime').value = movie.runtime || '';
                 
+                // NEW: Populate Summary and Cast fields directly from TMDb data
+                document.getElementById('summary').value = selectedMovieOverview || ''; 
+                document.getElementById('cast').value = (selectedMovieCast && Array.isArray(selectedMovieCast)) ? selectedMovieCast.join(', ') : '';
+
                 // Set poster URL and NEW TMDb ID on the form's dataset
                 if (movie.poster_path) {
                     const posterUrl = `${TMDB_IMAGE_BASE}${movie.poster_path}`;
@@ -1337,12 +1404,10 @@
                     document.getElementById('movieForm').removeAttribute('data-poster-url'); 
                     console.log('No poster available');
                 }
-                document.getElementById('movieForm').dataset.tmdbId = tmdbMovieId; // NEW: Store TMDb ID on form
+                document.getElementById('movieForm').dataset.tmdbId = tmdbMovieId; 
                 console.log('TMDb ID set:', tmdbMovieId);
 
                 // Check if this movie (by TMDb ID) already exists in Firestore's 'movies' collection
-                // This is important because the 'edit' logic will now rely on Firestore's Document ID,
-                // but adding via search/barcode means we first have a TMDB ID.
                 const existingMovieQuery = await db.collection('movies').where('tmdbId', '==', tmdbMovieId).limit(1).get();
                 let firestoreMovieId = null;
 
@@ -1350,29 +1415,21 @@
                     firestoreMovieId = existingMovieQuery.docs[0].id;
                     console.log('Movie already exists in Firestore with ID:', firestoreMovieId);
                     
-                    // If movie exists, and the current user has an interaction with it, load it
-                    // Simulate editing an existing movie from search result
-                    urlToEditId = firestoreMovieId; // Store this globally to trigger edit mode
-                    await checkEditMode(); // Call checkEditMode to load existing data
+                    urlToEditId = firestoreMovieId; 
+                    await checkEditMode(); 
                     showStatusMessage(`Movie already exists! Loading your personal details for "${movie.title}".`, 'info');
                     
-                    // After checkEditMode, title, year etc. will be populated.
-                    // The form title and button text will also be set to 'Edit Movie'/'Update Movie'.
                 } else {
                     console.log('Movie not yet in Firestore, preparing for new entry.');
-                    // If it's a new entry, clear previous edit context
                     editingMovieId = null; 
                     document.getElementById('formTitle').textContent = 'Add New Movie';
                     document.getElementById('submitBtn').textContent = 'Add Movie';
-                    // Re-clear fields that checkEditMode might have set if it was called previously without a match
-                    // This is less critical now as checkEditMode is more guarded
                 }
 
 
                 document.getElementById('movieSearch').value = '';
                 document.getElementById('searchResults').innerHTML = '';
                 
-                // Show final alert after all processing
                 showAlertModal('Details Loaded', `Details for "${movie.title}" have been loaded into the form. You can now add your personal rating and notes!`);
 
             } catch (error) {
