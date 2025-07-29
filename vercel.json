@@ -7,7 +7,7 @@
     ],
     "functions": {
       "api/tmdb.js": {
-        "runtime": "nodejs18.x"
+        "runtime": "nodejs@18.x"
       }
     }
   }
