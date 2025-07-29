@@ -527,9 +527,9 @@
             <a href="index.html" class="logo">tiny lizard</a>
             <div class="nav-links">
                 <a href="index.html" class="nav-link active">Library</a>
-                <a href="lists.html" class="nav-link">Lists</a>
-                <a href="stats.html" class="nav-link">Stats</a>
-                <a href="add-movie.html" class="add-movie-btn">+ Add Movie</a>
+                <a id="ListBtn" href="lists.html" class="add-movie-btn">Lists</a>
+                <a id="StatsBtn" href="stats.html" class="add-movie-btn">Stats</a>
+                <a id="addMovieNavbarBtn" href="add-movie.html" class="add-movie-btn">+ Add Movie</a> <!-- Added ID -->
                 <button id="logoutBtn" class="logout-btn">Logout</button>
             </div>
         </div>
@@ -582,7 +582,7 @@
             <div class="empty-state">
                 <h3>Your collection is empty</h3>
                 <p>Start building your movie library by adding your first DVD!</p>
-                <a href="add-movie.html" class="add-movie-btn">+ Add Your First Movie</a>
+                <a id="addFirstMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Your First Movie</a> <!-- Added ID -->
             </div>
         </div>
     </div>
@@ -681,16 +681,46 @@
             // Listen for authentication state changes
             auth.onAuthStateChanged(user => {
                 const userStatusDiv = document.getElementById('userStatus');
+                const addMovieNavbarBtn = document.getElementById('addMovieNavbarBtn');
+                const addFirstMovieBtn = document.getElementById('addFirstMovieBtn');
+                const logoutBtn = document.getElementById('logoutBtn');
+                const myMoviesViewBtn = document.querySelector('.view-mode-controls [data-view="my"]');
+                const allMoviesViewBtn = document.querySelector('.view-mode-controls [data-view="all"]');
+                const searchInput = document.getElementById('searchInput');
+
                 if (user) {
                     currentUser = user;
                     userStatusDiv.textContent = `Logged in as: ${user.email}`;
                     console.log('User logged in:', user.email, 'UID:', user.uid);
+                    
+                    // UI for logged-in user
+                    addMovieNavbarBtn.href = 'add-movie.html';
+                    addFirstMovieBtn.href = 'add-movie.html';
+                    logoutBtn.textContent = 'Logout';
+                    logoutBtn.onclick = setupLogout; // Re-attach logout handler
+                    myMoviesViewBtn.style.display = 'inline-block'; // Show "My Movies" button
+                    
                     loadMoviesFromFirestore(currentViewMode); 
+                    updateSearchBarPlaceholder(); // Update placeholder after view mode is set
                 } else {
                     currentUser = null;
                     userStatusDiv.textContent = 'Not logged in';
-                    console.log('User not logged in, redirecting to auth.html');
-                    window.location.href = 'auth.html'; 
+                    console.log('User not logged in, adjusting UI for unauthenticated access.');
+                    
+                    // UI for unauthenticated user
+                    addMovieNavbarBtn.href = 'auth.html'; // Redirect to login
+                    addFirstMovieBtn.href = 'auth.html'; // Redirect to login
+                    logoutBtn.textContent = 'Login'; // Change to Login button
+                    logoutBtn.onclick = redirectToAuth; // Redirect to auth page directly on click
+                    myMoviesViewBtn.style.display = 'none'; // Hide "My Movies" button
+                    
+                    // Force 'All Movies' view for unauthenticated users
+                    currentViewMode = 'all';
+                    allMoviesViewBtn.classList.add('active'); // Ensure 'All Movies' button is active
+                    document.querySelector('.view-mode-controls [data-view="my"]').classList.remove('active'); // Deactivate 'My Movies' button
+
+                    loadMoviesFromFirestore('all'); // Load all movies for unauthenticated view
+                    updateSearchBarPlaceholder(); // Update placeholder after view mode is set
                 }
             });
         });
@@ -702,7 +732,7 @@
                 try {
                     await auth.signOut();
                     showAlertModal('Logged Out', 'You have been successfully logged out.', () => {
-                        window.location.href = 'auth.html'; 
+                        window.location.href = 'index.html'; // Redirect to index.html after logout
                     });
                 } catch (error) {
                     console.error('Logout error:', error);
@@ -721,18 +751,27 @@
                     
                     currentViewMode = this.dataset.view;
                     loadMoviesFromFirestore(currentViewMode); 
+                    updateSearchBarPlaceholder(); // Update placeholder when view mode changes
                 });
             });
+        }
+
+        // --- Dynamic Search Bar Placeholder ---
+        function updateSearchBarPlaceholder() {
+            const searchInput = document.getElementById('searchInput');
+            if (currentViewMode === 'my') {
+                searchInput.placeholder = 'Search your movies...';
+            } else { // currentViewMode === 'all'
+                searchInput.placeholder = 'Search all movies...';
+            }
         }
 
         // --- Firestore Integration (Loading and Deleting) ---
         async function loadMoviesFromFirestore(viewMode) { 
             if (!currentUser) {
-                console.log("No user logged in, cannot load movies.");
-                movies = []; 
-                displayMovies();
-                updateStats();
-                return;
+                console.log("No user logged in, loading all movies for public view.");
+                // For unauthenticated users, we still load all movies, but they won't have personal data.
+                // The rules will ensure they can only read.
             }
 
             try {
@@ -746,48 +785,48 @@
                 }));
                 console.log("All main movies loaded from Firestore:", allMovies.length);
 
-                // Step 2: Fetch current user's interactions for all movies
+                // Step 2: Fetch current user's interactions for all movies (only if logged in)
                 myInteractions = {}; 
-                const interactionsRef = db.collection('users').doc(currentUser.uid).collection('movieInteractions');
-                const interactionsSnapshot = await interactionsRef.get();
+                if (currentUser) {
+                    const interactionsRef = db.collection('users').doc(currentUser.uid).collection('movieInteractions');
+                    const interactionsSnapshot = await interactionsRef.get();
 
-                interactionsSnapshot.docs.forEach(doc => {
-                    myInteractions[doc.id] = doc.data(); 
-                });
-                console.log("My interactions loaded:", Object.keys(myInteractions).length);
+                    interactionsSnapshot.docs.forEach(doc => {
+                        myInteractions[doc.id] = doc.data(); 
+                    });
+                    console.log("My interactions loaded:", Object.keys(myInteractions).length);
+                }
 
                 // Step 3: Combine main movie data with user's interaction data
-                // A movie is considered "in my collection" if an interaction document exists for it.
                 let combinedMovies = allMovies.map(movie => {
                     const interaction = myInteractions[movie.id];
                     return {
                         ...movie,
-                        myRating: interaction ? interaction.rating : 0, 
-                        myWatched: interaction ? interaction.watched : false, 
-                        myReview: interaction ? interaction.review : null,
-                        isInMyCollection: !!interaction // True if an interaction exists for this movie
+                        // Personal interaction data is only added if currentUser is defined AND an interaction exists
+                        myRating: (currentUser && interaction) ? interaction.rating : 0, 
+                        myWatched: (currentUser && interaction) ? interaction.watched : false, 
+                        myReview: (currentUser && interaction) ? interaction.review : null,
+                        isInMyCollection: (currentUser && !!interaction) // True if logged in AND an interaction exists
                     };
                 });
                 console.log("Combined all movies with my interactions:", combinedMovies.length); 
 
                 // Step 4: Apply view mode filter: 'my' means only movies present in myInteractions
                 if (viewMode === 'my') {
-                    // Filter to only include movies for which the current user has an interaction record.
                     movies = combinedMovies.filter(movie => movie.isInMyCollection); 
                     console.log("Filtered for 'My Movies' view (based on interaction records):", movies.length);
                 } else { // viewMode === 'all'
                     // Apply deduplication for 'All Movies' view
-                    // If multiple users added the same TMDB ID, prioritize the current user's version (if they have one)
                     let uniqueMoviesMap = {}; 
                     for (const movie of combinedMovies) { 
                         if (movie.tmdbId) { 
-                            // If TMDB ID not seen yet, or if current movie is in my collection, or if existing isn't owned by me, take current
                             const existingEntry = uniqueMoviesMap[movie.tmdbId];
+                            // Prioritize if current movie is in my collection, or if existing isn't owned by me
+                            // This ensures if I have a personal interaction, my version is shown in 'All Movies'
                             if (!existingEntry || movie.isInMyCollection) { 
                                 uniqueMoviesMap[movie.tmdbId] = movie;
                             }
                         } else {
-                            // For manually added movies without TMDB ID, they are treated as unique by their Firestore ID
                             uniqueMoviesMap[movie.id] = movie;
                         }
                     }
@@ -797,7 +836,9 @@
 
 
                 // Re-apply search and filter (from current active state) after loading and combining
-                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                const searchInput = document.getElementById('searchInput'); // Get current search term
+                const searchTerm = searchInput ? searchInput.value.toLowerCase() : ''; // Handle if searchInput not ready
+                
                 const activeFilterButton = document.querySelector('.filter-btn.active');
                 const currentFilter = activeFilterButton ? activeFilterButton.dataset.filter : 'all';
 
@@ -840,13 +881,12 @@
             let filteredMovies = movies;
             
             if (searchTerm) { 
-                // Updated search logic to include overview and cast
                 filteredMovies = filteredMovies.filter(movie => 
                     movie.title.toLowerCase().includes(searchTerm) ||
                     movie.director.toLowerCase().includes(searchTerm) ||
                     movie.genre.toLowerCase().includes(searchTerm) ||
-                    (movie.overview && movie.overview.toLowerCase().includes(searchTerm)) || // NEW: Search overview
-                    (movie.cast && movie.cast.some(castMember => castMember.toLowerCase().includes(searchTerm))) // NEW: Search cast
+                    (movie.overview && movie.overview.toLowerCase().includes(searchTerm)) || 
+                    (movie.cast && movie.cast.some(castMember => castMember.toLowerCase().includes(searchTerm))) 
                 );
             }
             
@@ -873,9 +913,13 @@
                     <div class="empty-state">
                         <h3>${emptyMessage}</h3>
                         <p>${searchTerm || filter !== 'all' ? 'Try adjusting your search or filters.' : 'Start building your movie library by adding your first DVD!'}</p>
-                        <a href="add-movie.html" class="add-movie-btn">+ Add Movie</a>
+                        <a id="emptyStateAddMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Your First Movie</a> <!-- Added ID -->
                     </div>
                 `;
+                // Adjust empty state button href based on auth state
+                if (!currentUser) {
+                    document.getElementById('emptyStateAddMovieBtn').href = 'auth.html';
+                }
                 return;
             }
 
@@ -890,7 +934,7 @@
                     <div class="movie-title">${movie.title}</div>
                     ${movie.year ? `<div class="movie-year">${movie.year}</div>` : ''}
                     
-                    ${movie.isInMyCollection ? ` <!-- Show personal rating/status ONLY if in my collection -->
+                    ${movie.isInMyCollection ? ` 
                         ${movie.myRating > 0 ? ` 
                             <div class="movie-rating">
                                 ${generateStarDisplay(movie.myRating)} 
@@ -921,7 +965,9 @@
                         
                         ${currentUser ? `
                             <button class="btn-add-to-list" onclick="addMovieToCustomList('${movie.id}')">Add to List</button>
-                        ` : ''}
+                        ` : `
+                            <button class="btn-add-to-list" onclick="redirectToAuth()">Add to List</button> <!-- Redirect for unauth users -->
+                        `}
                     </div>
                 </div>
             `).join('');
@@ -1002,17 +1048,21 @@
             });
         }
 
-        // NEW: Function to add an existing movie to the current user's personal collection (redirects to add-movie page)
+        // Function to redirect to auth page (for unauthenticated clicks)
+        function redirectToAuth() {
+            window.location.href = 'auth.html';
+        }
+
+        // Function to add an existing movie to the current user's personal collection (redirects to add-movie page)
         async function addExistingMovieToMyCollection(movieId) {
             if (!currentUser) {
                 showAlertModal('Authentication Required', 'You must be logged in to add movies to your collection.');
                 return;
             }
-            // Redirect to add-movie.html with the movie ID to let the user add their personal details
             window.location.href = `add-movie.html?edit=${movieId}`;
         }
 
-        // NEW: Placeholder function for "Add to List" (future custom lists)
+        // Placeholder function for "Add to List" (future custom lists)
         async function addMovieToCustomList(movieId) {
             if (!currentUser) {
                 showAlertModal('Authentication Required', 'You must be logged in to add movies to a list.');
