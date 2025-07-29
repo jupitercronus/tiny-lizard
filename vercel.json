@@ -4,10 +4,5 @@
         "source": "/api/(.*)",
         "destination": "/api"
       }
-    ],
-    "functions": {
-      "api/tmdb.js": {
-        "runtime": "nodejs@20.x"
-      }
-    }
+    ]
   }
