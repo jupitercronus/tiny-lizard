@@ -840,10 +840,13 @@
             let filteredMovies = movies;
             
             if (searchTerm) { 
+                // Updated search logic to include overview and cast
                 filteredMovies = filteredMovies.filter(movie => 
                     movie.title.toLowerCase().includes(searchTerm) ||
                     movie.director.toLowerCase().includes(searchTerm) ||
-                    movie.genre.toLowerCase().includes(searchTerm)
+                    movie.genre.toLowerCase().includes(searchTerm) ||
+                    (movie.overview && movie.overview.toLowerCase().includes(searchTerm)) || // NEW: Search overview
+                    (movie.cast && movie.cast.some(castMember => castMember.toLowerCase().includes(searchTerm))) // NEW: Search cast
                 );
             }
             
@@ -913,7 +916,7 @@
                             <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
                         ` : 
                         currentUser && !movie.isInMyCollection ? `
-                            <button class="btn-add-to-my-collection" onclick="addExistingMovieToMyCollection('${movie.id}')">Add to My Movies</button> <!-- Renamed button text -->
+                            <button class="btn-add-to-my-collection" onclick="addExistingMovieToMyCollection('${movie.id}')">Add to My Movies</button> 
                         ` : ''}
                         
                         ${currentUser ? `
@@ -962,7 +965,7 @@
         }
 
         async function deleteMovie(movieId) { 
-            showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your movies?', async (confirmed) => { // Changed confirmation text
+            showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your movies?', async (confirmed) => { 
                 if (confirmed) {
                     try {
                         if (!currentUser) {
