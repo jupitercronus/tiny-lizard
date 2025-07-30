@@ -156,7 +156,7 @@
         // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth(); 
-        const db = firebase.firestore(); // NEW: Firestore instance
+        const db = firebase.firestore(); 
 
         let isLoginMode = true; 
 
@@ -166,8 +166,8 @@
             const toggleAuthModeLink = document.getElementById('toggleAuthMode');
             const authForm = document.getElementById('authForm');
             const authMessageDiv = document.getElementById('authMessage');
-            const displayNameGroup = document.getElementById('displayNameGroup'); // NEW
-            const displayNameInput = document.getElementById('displayName'); // NEW
+            const displayNameGroup = document.getElementById('displayNameGroup'); 
+            const displayNameInput = document.getElementById('displayName'); 
 
             // Listen for auth state changes to redirect if already logged in
             auth.onAuthStateChanged(user => {
@@ -184,16 +184,16 @@
                     authTitle.textContent = 'Login';
                     authSubmitBtn.textContent = 'Login';
                     toggleAuthModeLink.textContent = 'Sign Up';
-                    displayNameGroup.style.display = 'none'; // Hide display name for login
-                    displayNameInput.removeAttribute('required'); // Make display name not required for login
+                    displayNameGroup.style.display = 'none'; 
+                    displayNameInput.removeAttribute('required'); 
                 } else {
                     authTitle.textContent = 'Sign Up';
                     authSubmitBtn.textContent = 'Sign Up';
                     toggleAuthModeLink.textContent = 'Login';
-                    displayNameGroup.style.display = 'block'; // Show display name for signup
-                    displayNameInput.setAttribute('required', 'true'); // Make display name required for signup
+                    displayNameGroup.style.display = 'block'; 
+                    displayNameInput.setAttribute('required', 'true'); 
                 }
-                authMessageDiv.style.display = 'none'; // Clear messages on mode switch
+                authMessageDiv.style.display = 'none'; 
             });
 
             authForm.addEventListener('submit', async function(e) {
@@ -203,13 +203,20 @@
 
                 const email = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
-                const displayName = document.getElementById('displayName').value; // NEW
+                const displayName = document.getElementById('displayName').value; 
 
                 try {
                     if (isLoginMode) {
                         await auth.signInWithEmailAndPassword(email, password);
                         displayAuthMessage('Logged in successfully! Redirecting...', 'success');
                     } else {
+                        // Validate displayName for signup
+                        if (!displayName.trim()) {
+                            displayAuthMessage('Username is required for sign up.', 'error');
+                            authSubmitBtn.disabled = false;
+                            return;
+                        }
+
                         // Sign up the user
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const user = userCredential.user;

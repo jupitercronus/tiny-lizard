@@ -660,7 +660,7 @@
             <div class="nav-links">
                 <a href="index.html" class="nav-link active">Library</a>
                 <a href="lists.html" class="nav-link">Lists</a> 
-                <a href="stats.html" class="nav-link">Stats</a> 
+                <a href="profile.html" class="nav-link">Profile</a> <!-- Updated href -->
                 <a id="addMovieNavbarBtn" href="add-movie.html" class="add-movie-btn">+ Add Movie</a> 
                 <button id="logoutBtn" class="logout-btn">Logout</button>
             </div>
@@ -717,7 +717,7 @@
                 <option value="unwatched">Unwatched</option>
                 <option value="favorites">5 Stars</option>
                 <option value="mostLiked">Most Liked</option>
-                <option value="leastLiked">Least Liked</option> <!-- Corrected typo -->
+                <option value="leastLiked">Least Liked</option> 
                 <option value="moviesOnly">Movies Only</option> 
                 <option value="tvShowsOnly">TV Shows Only</option> 
             </select>
@@ -987,13 +987,15 @@
                 }));
                 console.log("All main content loaded from Firestore:", allMovies.length);
 
-                // Fetch all user profiles to get display names
+                // Fetch all user profiles to get display names - ONLY IF LOGGED IN
                 userProfiles = {}; 
-                const usersSnapshot = await db.collection('users').get();
-                usersSnapshot.docs.forEach(doc => {
-                    userProfiles[doc.id] = doc.data();
-                });
-                console.log("User profiles loaded:", Object.keys(userProfiles).length);
+                if (currentUser) { 
+                    const usersSnapshot = await db.collection('users').get();
+                    usersSnapshot.docs.forEach(doc => {
+                        userProfiles[doc.id] = doc.data();
+                    });
+                    console.log("User profiles loaded:", Object.keys(userProfiles).length);
+                }
 
 
                 myInteractions = {}; 
@@ -1144,7 +1146,8 @@
                     </div>
                     <div class="movie-title">
                         ${movie.title || movie.name} 
-                        ${movie.contentType === 'tv' ? '<span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">TV Show</span>' : ''} 
+                        ${movie.contentType === 'tv' ? '<span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">TV Show</span>' : 
+                          movie.contentType === 'movie' ? '<span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">Movie</span>' : ''} 
                         ${movie.myOwned ? '<span class="owned-badge">Owned</span>' : ''} 
                     </div>
                     ${movie.year ? `<div class="movie-year">${movie.year}</div>` : ''}
@@ -1186,7 +1189,7 @@
                         `}
                     </div>
                     <div style="font-size: 0.75em; color: #888; margin-top: 10px;">Added by: ${movie.originalUploaderDisplayName}</div> 
-                    <button class="btn-small" onclick="openMovieDetailsModal('${movie.id}')" style="margin-top: 10px;">View Details</button> <!-- NEW: View Details Button -->
+                    <button class="btn-small" onclick="openMovieDetailsModal('${movie.id}')" style="margin-top: 10px;">View Details</button> 
                 </div>
             `).join('');
 
@@ -1213,8 +1216,6 @@
                 .filter(m => m.myWatched && m.runtime) 
                 .reduce((sum, m) => sum + parseInt(m.runtime), 0);
             const hoursDisplay = Math.round(totalHours / 60);
-
-            // Removed stat updates from HTML
         }
 
         function editMovie(movieId) {
@@ -1241,13 +1242,11 @@
                         }
 
                         if (movieToDelete.originalUploaderId === currentUser.uid) {
-                            // User is the original uploader: Delete the main movie document AND their interaction
                             await db.collection('movies').doc(movieId).delete();
                             await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
                             showAlertModal('Success', 'Movie (and your personal data for it) deleted successfully!');
                             console.log('Main movie document and user interaction deleted by original uploader.');
                         } else {
-                            // User is NOT the original uploader: Only delete their personal interaction for this movie
                             await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
                             showAlertModal('Success', 'Your personal data (rating, watched, review) for this movie has been removed.');
                             console.log('User interaction deleted (not original uploader).');
@@ -1263,12 +1262,10 @@
             });
         }
 
-        // Function to redirect to auth page (for unauthenticated clicks)
         function redirectToAuth() {
             window.location.href = 'auth.html';
         }
 
-        // Function to add an existing movie to the current user's personal collection (redirects to add-movie page)
         async function addExistingMovieToMyCollection(movieId) {
             if (!currentUser) {
                 showAlertModal('Authentication Required', 'You must be logged in to add movies to your collection.');
@@ -1277,7 +1274,6 @@
             window.location.href = `add-movie.html?edit=${movieId}`;
         }
 
-        // Placeholder function for "Add to List" (future custom lists)
         async function addMovieToCustomList(movieId) {
             if (!currentUser) {
                 showAlertModal('Authentication Required', 'You must be logged in to add movies to a list.');
@@ -1294,7 +1290,6 @@
             console.log(`Placeholder: Add movie ${movieId} ("${movieToAdd.title || movieToAdd.name}") to a custom list.`);
         }
 
-        // NEW: Function to open movie details modal
         async function openMovieDetailsModal(movieId) {
             const modal = document.getElementById('movieDetailsModal');
             document.getElementById('modalTitle').textContent = 'Loading...';
@@ -1312,20 +1307,19 @@
             document.getElementById('modalMyReview').textContent = '';
             document.getElementById('modalMyWatchedDate').textContent = '';
             document.getElementById('modalMyOwned').textContent = '';
-            document.getElementById('modalPersonalDetails').style.display = 'none'; // Hide personal details initially
+            document.getElementById('modalPersonalDetails').style.display = 'none'; 
 
-            modal.style.display = 'flex'; // Show modal
+            modal.style.display = 'flex'; 
 
             try {
                 const movieDoc = await db.collection('movies').doc(movieId).get();
                 if (!movieDoc.exists) {
-                    showAlertModal('Error', 'Movie details not found.');
+                    showAlertModal('Error', 'Content details not found.'); 
                     closeMovieDetailsModal();
                     return;
                 }
                 const movieData = movieDoc.data();
 
-                // Get personal interaction data if logged in
                 let userInteractionData = null;
                 if (currentUser) {
                     const interactionDoc = await db.collection('users').doc(currentUser.uid)
@@ -1335,25 +1329,23 @@
                     }
                 }
 
-                // Populate modal with main movie data
-                document.getElementById('modalTitle').textContent = movieData.title || movieData.name || 'Unknown Title';
+                document.getElementById('modalTitle').textContent = movieData.title || movieData.name || 'Unknown Title'; 
                 
                 if (movieData.posterUrl) {
-                    document.getElementById('modalPosterContainer').innerHTML = `<img src="${movieData.posterUrl}" alt="${movieData.title || movieData.name} poster">`;
+                    document.getElementById('modalPosterContainer').innerHTML = `<img src="${movieData.posterUrl}" alt="${movieData.title || movieData.name} poster">`; 
                 } else {
                     document.getElementById('modalPosterContainer').innerHTML = `<div class="no-poster">No Poster</div>`;
                 }
 
-                document.getElementById('modalYear').textContent = movieData.year || (movieData.first_air_date ? new Date(movieData.first_air_date).getFullYear() : 'N/A');
+                document.getElementById('modalYear').textContent = movieData.year || (movieData.first_air_date ? new Date(movieData.first_air_date).getFullYear() : 'N/A'); 
                 document.getElementById('modalDirector').textContent = movieData.director || 'N/A';
                 document.getElementById('modalGenre').textContent = movieData.genre || 'N/A';
-                document.getElementById('modalRuntime').textContent = movieData.runtime ? `${movieData.runtime} min` : 'N/A';
-                document.getElementById('modalContentType').textContent = movieData.contentType === 'tv' ? 'TV Show' : 'Movie';
+                document.getElementById('modalRuntime').textContent = movieData.runtime ? `${movieData.runtime} min` : (movieData.episode_run_time?.[0] ? `${movieData.episode_run_time[0]} min (per episode)` : 'N/A'); 
+                document.getElementById('modalContentType').textContent = movieData.contentType === 'tv' ? 'TV Show' : (movieData.contentType === 'movie' ? 'Movie' : 'N/A'); 
                 document.getElementById('modalUploader').textContent = movieData.originalUploaderDisplayName || 'N/A';
                 document.getElementById('modalOverview').textContent = movieData.overview || 'No summary available.';
                 document.getElementById('modalCast').textContent = (movieData.cast && movieData.cast.length > 0) ? movieData.cast.join(', ') : 'N/A';
 
-                // Populate personal details if available
                 if (userInteractionData) {
                     document.getElementById('modalPersonalDetails').style.display = 'block';
                     document.getElementById('modalMyRating').innerHTML = userInteractionData.rating > 0 ? generateStarDisplay(userInteractionData.rating) : 'Not Rated';
@@ -1362,28 +1354,27 @@
                     document.getElementById('modalMyWatchedDate').textContent = userInteractionData.watchedDate || 'N/A';
                     document.getElementById('modalMyOwned').textContent = userInteractionData.owned ? 'Yes' : 'No';
 
-                    // Set up edit/delete buttons in modal
                     const modalEditBtn = document.getElementById('modalEditBtn');
                     const modalDeleteBtn = document.getElementById('modalDeleteBtn');
 
                     modalEditBtn.onclick = () => {
                         closeMovieDetailsModal();
-                        editMovie(movieId); // Redirect to add-movie for editing
+                        editMovie(movieId); 
                     };
                     modalDeleteBtn.onclick = () => {
                         closeMovieDetailsModal();
-                        deleteMovie(movieId); // Call delete function
+                        deleteMovie(movieId); 
                     };
-                    modalEditBtn.style.display = 'inline-block'; // Show if in collection
-                    modalDeleteBtn.style.display = 'inline-block'; // Show if in collection
+                    modalEditBtn.style.display = 'inline-block'; 
+                    modalDeleteBtn.style.display = 'inline-block'; 
 
                 } else {
-                    document.getElementById('modalPersonalDetails').style.display = 'none'; // Hide if not in my collection
+                    document.getElementById('modalPersonalDetails').style.display = 'none'; 
                 }
 
             } catch (error) {
-                console.error('Error opening movie details modal:', error);
-                showAlertModal('Error', 'Failed to load movie details: ' + error.message);
+                console.error('Error opening content details modal:', error); 
+                showAlertModal('Error', 'Failed to load content details: ' + error.message); 
                 closeMovieDetailsModal();
             }
         }

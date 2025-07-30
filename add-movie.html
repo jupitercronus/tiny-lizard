@@ -355,21 +355,23 @@
     </style>
 </head>
 <body>
-    <nav class="navbar">
+     <nav class="navbar">
         <div class="nav-container">
-            <a href="index.html" class="logo">tiny lizard</a>
-            <div class="nav-links">
-                <a href="index.html" class="nav-link">Home</a> <!-- NEW HOME BUTTON -->
-                <button id="logoutBtn" class="logout-btn">Logout</button> <!-- NEW LOGOUT BUTTON -->
+             <a href="index.html" class="logo">the library sale</a>
+                <div class="nav-links">
+                    <a href="index.html" class="nav-link active">library</a>
+                    <a href="lists.html" class="nav-link">lists</a> 
+                    <a href="profile.html" class="nav-link">profile</a> 
+                    <button id="logoutBtn" class="logout-btn">logout</button>
+                </div>
             </div>
-        </div>
     </nav>
 
     <div class="container">
-        <h1 id="formTitle">Add New Movie</h1>
+        <h1 id="formTitle">Add New Media</h1>
         
         <div class="search-section">
-            <h3>🔍 Search for Movie</h3>
+            <h3>🔍 Search for Media</h3>
             <div class="search-controls">
                 <input type="text" id="movieSearch" placeholder="Type movie title to search...">
                 <button type="button" id="searchBtn" class="btn">Search</button>
@@ -458,6 +460,21 @@
             </div>
             <!-- END NEWLY ADDED FIELDS -->
 
+            <!-- NEW: Content Type Dropdown -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="contentType">Content Type *</label>
+                    <select id="contentType" required>
+                        <option value="movie">Movie</option>
+                        <option value="tv">TV Show</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <!-- Placeholder for future field -->
+                </div>
+            </div>
+            <!-- END NEW Content Type Dropdown -->
+
             <div class="form-group">
                 <label for="review">Review/Notes</label>
                 <textarea id="review" rows="4" placeholder="What did you think of this movie?"></textarea>
@@ -505,7 +522,6 @@
         // Global variables to store additional TMDb data
         let selectedMovieOverview = null; 
         let selectedMovieCast = []; 
-        // NEW: Global variable for content type (movie or tv)
         let selectedContentType = null; 
 
         // Flag to control public fields editability
@@ -1037,7 +1053,7 @@
                     overview: document.getElementById('summary').value.trim() || null, 
                     cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null,
                     isManualEntry: isPublicFieldsEditable, 
-                    contentType: selectedContentType || 'movie' // NEW: Save content type (default to 'movie' if not set)
+                    contentType: document.getElementById('contentType').value // Get from dropdown
                 };
 
                 // Data for the user's personal 'movieInteractions' subcollection
@@ -1129,7 +1145,7 @@
                     runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null,
                     overview: document.getElementById('summary').value.trim() || null, 
                     cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null,
-                    contentType: selectedContentType || 'movie' // NEW: Update content type
+                    contentType: document.getElementById('contentType').value // Get from dropdown
                 };
 
                 // Data for updating the user's personal 'movieInteractions' subcollection
@@ -1185,12 +1201,12 @@
             currentRating = 0;
             updateStars();
             editingMovieId = null; 
-            document.getElementById('formTitle').textContent = 'Add New Movie';
-            document.getElementById('submitBtn').textContent = 'Add Movie';
+            document.getElementById('formTitle').textContent = 'Add New Movie'; // Reset title
+            document.getElementById('submitBtn').textContent = 'Add Movie'; // Reset button text
             document.getElementById('statusMessage').innerHTML = '';
             selectedMovieOverview = null; 
             selectedMovieCast = []; 
-            selectedContentType = null; // NEW: Clear content type
+            selectedContentType = null; 
             document.getElementById('summary').value = ''; 
             document.getElementById('cast').value = ''; 
             document.getElementById('watchedCheckbox').checked = false; 
@@ -1216,17 +1232,17 @@
 
             editingMovieId = movieId; 
 
-            document.getElementById('formTitle').textContent = 'Loading Movie for Edit...';
-            showStatusMessage('Loading movie for editing...', 'info');
+            document.getElementById('formTitle').textContent = 'Loading Content for Edit...'; // Updated title
+            showStatusMessage('Loading content for editing...', 'info'); // Updated message
 
             try {
                 // Step 1: Fetch the main movie document
                 const movieDoc = await db.collection('movies').doc(movieId).get();
 
                 if (!movieDoc.exists) {
-                    console.error('Error: Main movie document not found for editing with ID:', movieId);
-                    showStatusMessage('Movie not found for editing', 'error');
-                    showAlertModal('Error', 'Movie not found for editing. Starting a new entry.');
+                    console.error('Error: Main content document not found for editing with ID:', movieId); // Updated message
+                    showStatusMessage('Content not found for editing', 'error'); // Updated message
+                    showAlertModal('Error', 'Content not found for editing. Starting a new entry.'); // Updated message
                     clearForm(); 
                     return;
                 }
@@ -1266,7 +1282,7 @@
                 // Store loaded overview and cast into global variables for updateMovie to use
                 selectedMovieOverview = mainMovieData.overview || null;
                 selectedMovieCast = mainMovieData.cast || [];
-                selectedContentType = mainMovieData.contentType || 'movie'; // NEW: Load content type
+                selectedContentType = mainMovieData.contentType || 'movie'; 
 
                 // Populate the form with main movie data
                 document.getElementById('title').value = mainMovieData.title || '';
@@ -1277,6 +1293,9 @@
                 
                 document.getElementById('summary').value = mainMovieData.overview || ''; 
                 document.getElementById('cast').value = (mainMovieData.cast && Array.isArray(mainMovieData.cast)) ? mainMovieData.cast.join(', ') : '';
+
+                // NEW: Set content type dropdown value when editing
+                document.getElementById('contentType').value = selectedContentType;
 
                 // Set poster URL and TMDb ID
                 if (mainMovieData.posterUrl) {
@@ -1298,14 +1317,14 @@
                 document.getElementById('watchedDate').value = userInteractionData.watchedDate || ''; 
                 document.getElementById('ownedCheckbox').checked = userInteractionData.owned; 
                 
-                document.getElementById('formTitle').textContent = 'Edit Movie'; // Consider "Edit Content" here
-                document.getElementById('submitBtn').textContent = 'Update Movie'; // Consider "Update Content" here
-                showStatusMessage('Movie loaded for editing', 'success');
+                document.getElementById('formTitle').textContent = 'Edit Content'; // Updated title
+                document.getElementById('submitBtn').textContent = 'Update Content'; // Updated button
+                showStatusMessage('Content loaded for editing', 'success'); // Updated message
 
             } catch (error) {
-                console.error('Unexpected error loading movie:', error);
-                showStatusMessage('Unexpected error loading movie: ' + error.message, 'error');
-                showAlertModal('Error', 'An unexpected error occurred while loading the movie.');
+                console.error('Unexpected error loading content:', error); // Updated message
+                showStatusMessage('Unexpected error loading content: ' + error.message, 'error'); // Updated message
+                showAlertModal('Error', 'An unexpected error occurred while loading the content.'); // Updated message
                 clearForm();
             }
         }
@@ -1446,17 +1465,15 @@
             console.log('Displaying results:', results);
             
             if (!results || results.length === 0) { 
-                resultsDiv.innerHTML = '<p>No content found for your search.</p>'; // Updated message
+                resultsDiv.innerHTML = '<p>No content found for your search.</p>'; 
                 return;
             }
             
             try {
-                const html = results.slice(0, 10).map((item, index) => { // Renamed 'movie' to 'item' for generality
+                const html = results.slice(0, 10).map((item, index) => { 
                     console.log(`Processing item ${index}:`, item);
                     
-                    // Use item.title for movies, item.name for TV shows
                     const title = item.title || item.name || 'Unknown Title';
-                    // Use release_date for movies, first_air_date for TV shows
                     const year = item.release_date ? new Date(item.release_date).getFullYear() : (item.first_air_date ? new Date(item.first_air_date).getFullYear() : 'Unknown Year');
                     const overview = item.overview || 'No description available';
 
@@ -1485,7 +1502,7 @@
             }
         }
 
-        async function selectMovie(tmdbContentId, contentType) { // Added contentType parameter
+        async function selectMovie(tmdbContentId, contentType) { 
             try {
                 showStatusMessage('Loading content details...', 'info');
                 console.log('Selecting content ID:', tmdbContentId, 'Type:', contentType);
@@ -1513,7 +1530,7 @@
                 selectedMovieOverview = content.overview || null; 
                 console.log('Extracted overview:', selectedMovieOverview);
 
-                // Extract top billed cast 
+                // Extract top billed cast (e.g., first 3 actors)
                 selectedMovieCast = content.credits?.cast?.slice(0, 3).map(person => person.name) || [];
                 console.log('Extracted cast:', selectedMovieCast);
 
@@ -1528,10 +1545,13 @@
                 document.getElementById('year').value = content.release_date ? new Date(content.release_date).getFullYear() : (content.first_air_date ? new Date(content.first_air_date).getFullYear() : ''); 
                 document.getElementById('director').value = director;
                 document.getElementById('genre').value = genres;
-                document.getElementById('runtime').value = content.runtime || content.episode_run_time?.[0] || ''; 
-                
+                document.getElementById('runtime').value = content.runtime ? `${content.runtime}` : (content.episode_run_time?.[0] ? `${content.episode_run_time[0]}` : ''); // Runtime as number
+
                 document.getElementById('summary').value = selectedMovieOverview || ''; 
                 document.getElementById('cast').value = (selectedMovieCast && Array.isArray(selectedMovieCast)) ? selectedMovieCast.join(', ') : '';
+
+                // Set content type dropdown value
+                document.getElementById('contentType').value = selectedContentType;
 
                 // Set poster URL and TMDb ID on the form's dataset
                 if (content.poster_path) {
@@ -1551,21 +1571,21 @@
 
                 // Check if this content (by TMDb ID) already exists in Firestore's 'movies' collection
                 const existingContentQuery = await db.collection('movies').where('tmdbId', '==', tmdbContentId).limit(1).get();
-                let firestoreDocId = null; 
+                let firestoreMovieId = null; 
 
                 if (!existingContentQuery.empty) {
-                    firestoreDocId = existingContentQuery.docs[0].id;
-                    console.log('Content already exists in Firestore with ID:', firestoreDocId);
+                    firestoreMovieId = existingContentQuery.docs[0].id;
+                    console.log('Content already exists in Firestore with ID:', firestoreMovieId);
                     
-                    urlToEditId = firestoreDocId; 
+                    urlToEditId = firestoreMovieId; 
                     await checkEditMode(); 
                     showStatusMessage(`Content already exists! Loading your personal details for "${content.title || content.name}".`, 'info'); 
                     
                 } else {
                     console.log('Content not yet in Firestore, preparing for new entry.');
                     editingMovieId = null; 
-                    document.getElementById('formTitle').textContent = 'Add New Content'; // Updated title
-                    document.getElementById('submitBtn').textContent = 'Add Content'; // Updated button
+                    document.getElementById('formTitle').textContent = 'Add New Content'; 
+                    document.getElementById('submitBtn').textContent = 'Add Content'; 
                 }
 
 
