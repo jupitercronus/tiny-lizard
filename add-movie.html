@@ -596,6 +596,7 @@
                 ].sort((a, b) => b.popularity - a.popularity);
 
                 displayResults(combinedResults);
+                showStatusMessage(`${combinedResults.length} results found.`, 'success');
             } catch (error) {
                 console.error("Search error:", error);
                 showStatusMessage('Search failed.', 'error');
@@ -617,7 +618,7 @@
                         <img src="${item.poster_path ? TMDB_IMAGE_BASE + item.poster_path : ''}" class="search-result-poster" onerror="this.style.display='none'">
                         <div class="search-result-info">
                             <h4>${title} (${year}) <span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px;">${type}</span></h4>
-                            <p>${item.overview.substring(0, 100)}...</p>
+                            <p>${(item.overview || '').substring(0, 100)}...</p>
                         </div>
                     </div>
                 `;
@@ -651,18 +652,50 @@
                 showStatusMessage('Could not load details.', 'error');
             }
         }
-
-        function setupBarcodeScanner() { /* Your full barcode scanner setup code */ }
-        function setupStarRating() { /* Your full star rating setup code */ }
-        function updateStars() { /* Your star update logic */ }
+        
+        function setupStarRating() {
+            const stars = document.querySelectorAll('.star');
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    currentRating = parseInt(this.dataset.rating);
+                    updateStars();
+                });
+            });
+        }
+        function updateStars() {
+            const stars = document.querySelectorAll('.star');
+            stars.forEach(star => {
+                star.classList.toggle('active', parseInt(star.dataset.rating) <= currentRating);
+            });
+        }
         function togglePublicFieldsReadonly(isReadonly) {
-             const fields = ['title', 'year', 'director', 'genre', 'summary', 'cast'];
-             fields.forEach(id => document.getElementById(id).readOnly = isReadonly);
+             const fields = ['title', 'year', 'director', 'genre', 'summary', 'cast', 'contentType'];
+             fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el.tagName === 'SELECT') {
+                    el.disabled = isReadonly;
+                } else {
+                    el.readOnly = isReadonly;
+                }
+             });
         }
         function showAlertModal(title, message, onOk = () => {}) { 
-            alert(`${title}\n${message}`);
-            onOk();
+            const modal = document.getElementById('alertModal');
+            document.getElementById('alertModalTitle').textContent = title;
+            document.getElementById('alertModalMessage').textContent = message;
+            modal.style.display = 'flex';
+            document.getElementById('alertModalOk').onclick = () => {
+                modal.style.display = 'none';
+                onOk();
+            };
         }
+        function showStatusMessage(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+        }
+        function setupBarcodeScanner() { /* Your full barcode scanner setup code here */ }
+        function lookupMovieByBarcode(barcode) { /* Your full barcode lookup code here */ }
+        function extractMovieTitle(productName) { /* Your full title extraction code here */ }
     </script>
 </body>
 </html>
