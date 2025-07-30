@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - the library sale</title>
-    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
@@ -60,22 +60,11 @@
         .nav-link.active {
             background: #007bff;
         }
-
-        .add-movie-btn {
-            background: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-        }
-
-        .add-movie-btn:hover {
-            background: #0056b3;
-        }
         
-        .logout-btn { 
+        .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; transition: background-color 0.3s ease; }
+        .add-media-btn:hover { background: #0056b3; }
+        
+        .auth-btn { 
             background: #dc3545;
             color: white;
             padding: 8px 16px;
@@ -87,7 +76,7 @@
             transition: background-color 0.3s ease;
         }
 
-        .logout-btn:hover { 
+        .auth-btn:hover { 
             background: #c82333;
         }
 
@@ -153,33 +142,66 @@
             text-align: center;
         }
 
-        .movie-list-section {
+        .media-list-section {
             background: white;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px; /* Added margin for spacing */
+            margin-bottom: 30px;
         }
 
-        .movie-list-grid {
+        .media-list-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 20px;
         }
 
-        .movie-list-item {
+        .media-list-item {
             text-align: center;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        
+        .media-list-item:hover .media-list-poster {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
 
-        .movie-list-item img {
+        .media-list-poster {
             width: 100%;
             height: auto;
             border-radius: 5px;
             box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            margin-bottom: 10px;
+        }
+        
+        .no-poster-small {
+            width: 100%;
+            padding-top: 150%; /* Aspect ratio 2:3 */
+            position: relative;
+            background: #f0f0f0;
+            border-radius: 5px;
+             margin-bottom: 10px;
+        }
+        
+        .no-poster-small::after {
+            content: 'No Poster';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #999;
         }
 
-        .movie-list-item p {
-            font-size: 0.8em;
+        .media-list-item p {
+            font-size: 0.9em;
             color: #555;
             margin-top: 5px;
             word-wrap: break-word;
@@ -189,76 +211,7 @@
             text-align: center;
             color: #888;
             padding: 20px;
-        }
-        
-        /* NEW: Styles for dropdown filter on profile page */
-        .list-filter-dropdown {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: white;
-            font-size: 16px;
-            color: #333;
-            cursor: pointer;
-            appearance: none;
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%2C197.3L159.9%2C69.8c-1.8-1.8-4.7-1.8-6.5%2C0L5.4%2C197.3c-1.8%2C1.8-1.8%2C4.7%2C0%2C6.5l14.4%2C14.4c1.8%2C1.8%2C4.7%2C1.8%2C6.5%2C0l118.8-118.7l118.8%2C118.7c1.8%2C1.8%2C4.7%2C1.8%2C6.5%2C0l14.4-14.4C288.8%2C202%2C288.8%2C199.1%2C287%2C197.3z%22%2F%3E%3C%2Fsvg%3E');
-            background-repeat: no-repeat;
-            background-position: right 8px top 50%;
-            background-size: 12px auto;
-            margin-left: 15px; /* Spacing from title */
-        }
-
-
-        /* Modal Styles (copied for consistency) */
-        .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1000; 
-            left: 0;
-            top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: auto; 
-            background-color: rgba(0,0,0,0.4); 
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 25px;
-            border: 1px solid #888;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
-            text-align: center;
-        }
-
-        .modal-content h3 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        .modal-content p {
-            margin-bottom: 20px;
-            color: #666;
-        }
-
-        .modal-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-        }
-
-        .modal-btn.ok {
-            background: #007bff;
-            color: white;
-        }
-
-        .modal-btn.ok:hover {
-            background: #0056b3;
+            grid-column: 1 / -1; /* Span all columns */
         }
         
         @media (max-width: 768px) {
@@ -273,10 +226,10 @@
                 font-size: 2em;
             }
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
             }
-            .movie-list-grid {
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            .media-list-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
             }
         }
     </style>
@@ -288,105 +241,62 @@
             <div class="nav-links">
                 <a href="index.html" class="nav-link">Library</a>
                 <a href="lists.html" class="nav-link">Lists</a> 
-                <a href="profile.html" class="nav-link active">Profile</a> <!-- Active link -->
-                <a id="addMovieNavbarBtn" href="add-movie.html" class="add-movie-btn">+ Add Movie</a> 
-                <button id="logoutBtn" class="logout-btn">Logout</button>
+                <a href="profile.html" class="nav-link active">Profile</a>
+                <a href="add-movie.html" class="add-media-btn">+ Add Media</a> 
+                <button id="authBtn" class="auth-btn">Logout</button>
             </div>
         </div>
     </nav>
 
     <div class="main-container">
-        <div class="profile-section">
-            <div class="profile-header">
-                <h1 id="profileDisplayName">Loading Profile...</h1>
-                <p id="profileEmail"></p>
+        <div id="profileContainer">
+            <div class="profile-section">
+                <div class="profile-header">
+                    <h1 id="profileDisplayName">Loading...</h1>
+                    <p id="profileEmail"></p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalContentCount">0</div>
+                        <div class="stat-label">Total in Collection</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="watchedContentCount">0</div>
+                        <div class="stat-label">Watched</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="ownedContentCount">0</div>
+                        <div class="stat-label">Owned Physical Copies</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="avgRating">0.0</div>
+                        <div class="stat-label">Average Rating</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalHours">0</div>
+                        <div class="stat-label">Hours Watched</div>
+                    </div>
+                </div>
             </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number" id="totalContentCount">0</div>
-                    <div class="stat-label">Total Content</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="watchedContentCount">0</div>
-                    <div class="stat-label">Watched</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="ownedContentCount">0</div>
-                    <div class="stat-label">Owned</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="avgRating">0.0</div>
-                    <div class="stat-label">Average Rating</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalHours">0</div>
-                    <div class="stat-label">Hours Watched</div>
+            <h2 class="section-title">My Watched Content</h2>
+            <div class="media-list-section">
+                <div id="watchedContentList" class="media-list-grid">
+                    <div class="empty-list">Loading watched content...</div>
                 </div>
             </div>
-        </div>
 
-        <h2 class="section-title">
-            Watched Content
-            <select id="watchedSortDropdown" class="list-filter-dropdown"> <!-- NEW: Dropdown for sorting watched list -->
-                <option value="watchedDateDesc">Watch Date (Newest)</option>
-                <option value="watchedDateAsc">Watch Date (Oldest)</option>
-                <option value="ratingDesc">Rating (Highest)</option>
-                <option value="ratingAsc">Rating (Lowest)</option>
-                <option value="titleAsc">Title (A-Z)</option>
-                <option value="titleDesc">Title (Z-A)</option>
-                <option value="releaseDateDesc">Release Date (Newest)</option>
-                <option value="releaseDateAsc">Release Date (Oldest)</option>
-            </select>
-        </h2>
-        <div class="movie-list-section">
-            <div id="watchedContentList" class="movie-list-grid"> <!-- Renamed ID -->
-                <div class="empty-list">No watched content yet.</div>
-            </div>
-        </div>
-
-        <h2 class="section-title">My Owned Content</h2>
-        <div class="movie-list-section">
-            <div id="ownedContentList" class="movie-list-grid">
-                <div class="empty-list">No owned content yet.</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modals (copied for consistency) -->
-    <div id="alertModal" class="modal">
-        <div class="modal-content">
-            <h3 id="alertModalTitle">Alert</h3>
-            <p id="alertModalMessage">Something happened.</p>
-            <div class="modal-buttons">
-                <button class="modal-btn ok" id="alertModalOk">OK</button>
+            <h2 class="section-title">My Owned Content</h2>
+            <div class="media-list-section">
+                <div id="ownedContentList" class="media-list-grid">
+                    <div class="empty-list">Loading owned content...</div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Global variables
-        let currentUser = null;
-        let myInteractions = []; // Store raw interaction data for calculations
-        let allMoviesData = {}; // Store main movie data keyed by ID for quick lookup
-        let currentWatchedSort = 'watchedDateDesc'; // NEW: Default sort for watched list
-
-        // --- Modal Functions (copied for consistency) ---
-        function showAlertModal(title, message, onOk = () => {}) {
-            const modal = document.getElementById('alertModal');
-            document.getElementById('alertModalTitle').textContent = title;
-            document.getElementById('alertModalMessage').textContent = message;
-            modal.style.display = 'flex'; 
-
-            const okBtn = document.getElementById('alertModalOk');
-
-            okBtn.onclick = null; 
-            okBtn.onclick = () => {
-                modal.style.display = 'none';
-                onOk();
-            };
-        }
-
         // --- Firebase Initialization ---
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
@@ -394,131 +304,104 @@
           projectId: "tiny-lizard",
           storageBucket: "tiny-lizard.firebasestorage.app",
           messagingSenderId: "250872474692",
-          appId: "1:250872474692:web:969e0b1302ae3cb4666011",
-          measurementId: "G-43FM6WR90B"
+          appId: "1:250872474692:web:969e0b1302ae3cb4666011"
         };
-
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore(); 
         const auth = firebase.auth(); 
         // --- End Firebase Initialization ---
 
-        // Initialize the page
-        document.addEventListener('DOMContentLoaded', function() {
-            setupLogout(); // Setup logout button
-            setupWatchedSortDropdown(); // NEW: Setup dropdown for watched list
+        let currentUser = null;
 
-            // Listen for authentication state changes
+        document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(user => {
+                const authBtn = document.getElementById('authBtn');
                 if (user) {
                     currentUser = user;
-                    console.log('User logged in to profile:', user.email, 'UID:', user.uid);
-                    loadProfileData(); // Load profile data and stats
+                    authBtn.textContent = 'Logout';
+                    loadProfileData();
                 } else {
-                    currentUser = null;
-                    console.log('User not logged in, redirecting to auth.html');
-                    window.location.href = 'auth.html'; // Redirect to login page if not authenticated
+                    authBtn.textContent = 'Login';
+                    window.location.href = 'auth.html';
                 }
             });
+            
+            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
         });
 
-        // --- Logout Functionality ---
-        function setupLogout() {
-            const logoutBtn = document.getElementById('logoutBtn');
-            // Ensure button exists before adding listener (for pages that might not have it)
-            if (logoutBtn) { 
-                logoutBtn.addEventListener('click', async () => {
-                    try {
-                        await auth.signOut();
-                        showAlertModal('Logged Out', 'You have been successfully logged out.', () => {
-                            window.location.href = 'index.html'; // Redirect to main library after logout
-                        });
-                    } catch (error) {
-                        console.error('Logout error:', error);
-                        showAlertModal('Logout Failed', 'An error occurred during logout: ' + error.message);
-                    }
-                });
+        async function handleAuthButtonClick() {
+            if (currentUser) {
+                await auth.signOut();
+            } else {
+                window.location.href = 'auth.html';
             }
         }
 
-        // NEW: Setup Watched Sort Dropdown
-        function setupWatchedSortDropdown() {
-            const dropdown = document.getElementById('watchedSortDropdown');
-            dropdown.addEventListener('change', function() {
-                currentWatchedSort = this.value;
-                displayWatchedContent(); // Re-display watched content with new sort
-            });
-        }
-
-        // --- Profile Data Loading & Display ---
         async function loadProfileData() {
-            if (!currentUser) {
-                console.log("No user logged in, cannot load profile data.");
-                return;
-            }
+            if (!currentUser) return;
+
+            // Display user info immediately
+            document.getElementById('profileDisplayName').textContent = currentUser.displayName || 'User';
+            document.getElementById('profileEmail').textContent = currentUser.email;
 
             try {
-                // Fetch user's profile document (for display name)
-                const userProfileDoc = await db.collection('users').doc(currentUser.uid).get();
-                if (userProfileDoc.exists) {
-                    const profileData = userProfileDoc.data();
-                    document.getElementById('profileDisplayName').textContent = profileData.displayName || currentUser.email;
-                    document.getElementById('profileEmail').textContent = currentUser.email;
-                } else {
-                    document.getElementById('profileDisplayName').textContent = currentUser.displayName || currentUser.email;
-                    document.getElementById('profileEmail').textContent = currentUser.email;
-                    console.warn('User profile document not found in Firestore for UID:', currentUser.uid);
+                // Fetch all of the user's interactions
+                const interactionsSnapshot = await db.collection('users').doc(currentUser.uid).collection('movieInteractions').get();
+                const interactions = interactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                if (interactions.length === 0) {
+                    // Handle case where user has no interactions yet
+                    calculateAndDisplayStats([]);
+                    displayWatchedContent([]);
+                    displayOwnedContent([]);
+                    return;
                 }
 
-                // Fetch all user's movie interactions
-                const interactionsSnapshot = await db.collection('users').doc(currentUser.uid).collection('movieInteractions').get();
-                myInteractions = interactionsSnapshot.docs.map(doc => ({
-                    id: doc.id, // This is the movie ID
-                    ...doc.data()
-                }));
-                console.log("User's movie interactions loaded:", myInteractions.length);
-
-                // Fetch all main movie data (needed for details like title, runtime, poster for lists)
-                const mainMoviesSnapshot = await db.collection('movies').get();
-                allMoviesData = {}; // Reset
-                mainMoviesSnapshot.docs.forEach(doc => {
+                // Get the list of all media IDs from the interactions
+                const mediaIds = interactions.map(i => i.id);
+                
+                // Fetch all the corresponding main media documents
+                const mediaSnapshot = await db.collection('movies').where(firebase.firestore.FieldPath.documentId(), 'in', mediaIds).get();
+                const allMoviesData = {};
+                mediaSnapshot.forEach(doc => {
                     allMoviesData[doc.id] = doc.data();
                 });
-                console.log("All main movies data loaded for profile calculations:", Object.keys(allMoviesData).length);
 
+                // Combine interaction data with main media data
+                const fullMediaDetails = interactions.map(interaction => {
+                    const mediaData = allMoviesData[interaction.id];
+                    return {
+                        ...interaction, // myRating, myWatched, etc.
+                        ...mediaData   // title, posterUrl, etc.
+                    };
+                });
 
-                calculateAndDisplayStats();
-                displayWatchedContent(); // Renamed function call
-                displayOwnedContent();
+                // Now we can calculate stats and render the lists
+                calculateAndDisplayStats(fullMediaDetails);
+                displayWatchedContent(fullMediaDetails.filter(m => m.watched));
+                displayOwnedContent(fullMediaDetails.filter(m => m.owned));
 
             } catch (error) {
-                console.error('Error loading profile data:', error);
-                showAlertModal('Error', 'Failed to load profile data: ' + error.message);
+                console.error("Error loading profile data:", error);
+                document.getElementById('profileContainer').innerHTML = '<h2>Error loading profile. Please try again.</h2>';
             }
         }
 
-        function calculateAndDisplayStats() {
-            let totalContent = myInteractions.length;
-            let watchedContent = myInteractions.filter(item => item.watched).length;
-            let ownedContent = myInteractions.filter(item => item.owned).length;
+        function calculateAndDisplayStats(mediaItems) {
+            const totalContent = mediaItems.length;
+            const watchedContent = mediaItems.filter(item => item.watched).length;
+            const ownedContent = mediaItems.filter(item => item.owned).length;
             
-            let totalRating = 0;
-            let ratedCount = 0;
-            let totalRuntimeMinutes = 0;
-
-            myInteractions.forEach(interaction => {
-                if (interaction.rating && interaction.rating > 0) {
-                    totalRating += interaction.rating;
-                    ratedCount++;
-                }
-                // Only sum runtime for watched movies that have a runtime value
-                if (interaction.watched && allMoviesData[interaction.id] && allMoviesData[interaction.id].runtime) {
-                    totalRuntimeMinutes += parseInt(allMoviesData[interaction.id].runtime);
-                }
-            });
-
-            const avgRating = ratedCount > 0 ? (totalRating / ratedCount).toFixed(1) : '0.0';
-            const totalHours = Math.round(totalRuntimeMinutes / 60);
+            const ratedItems = mediaItems.filter(item => item.rating > 0);
+            const avgRating = ratedItems.length > 0
+                ? (ratedItems.reduce((sum, item) => sum + item.rating, 0) / ratedItems.length).toFixed(1)
+                : '0.0';
+            
+            const totalHours = Math.round(
+                mediaItems
+                    .filter(item => item.watched && item.runtime)
+                    .reduce((sum, item) => sum + parseInt(item.runtime), 0) / 60
+            );
 
             document.getElementById('totalContentCount').textContent = totalContent;
             document.getElementById('watchedContentCount').textContent = watchedContent;
@@ -527,123 +410,44 @@
             document.getElementById('totalHours').textContent = totalHours;
         }
 
-        // NEW: displayWatchedContent (formerly displayRecentlyWatched)
-        function displayWatchedContent() {
-            const watchedContentListDiv = document.getElementById('watchedContentList'); // Renamed ID
-            let watchedItems = myInteractions.filter(item => item.watched); // All watched items
-
-            // Apply sorting based on currentWatchedSort
-            switch(currentWatchedSort) {
-                case 'watchedDateDesc':
-                    watchedItems.sort((a, b) => {
-                        const dateA = a.watchedDate ? new Date(a.watchedDate) : new Date(0); // Undated to epoch start
-                        const dateB = b.watchedDate ? new Date(b.watchedDate) : new Date(0);
-                        return dateB - dateA; // Newest first
-                    });
-                    break;
-                case 'watchedDateAsc':
-                    watchedItems.sort((a, b) => {
-                        const dateA = a.watchedDate ? new Date(a.watchedDate) : new Date(0);
-                        const dateB = b.watchedDate ? new Date(b.watchedDate) : new Date(0);
-                        return dateA - dateB; // Oldest first
-                    });
-                    break;
-                case 'ratingDesc':
-                    watchedItems.sort((a, b) => b.rating - a.rating); // Highest rating first
-                    break;
-                case 'ratingAsc':
-                    watchedItems.sort((a, b) => a.rating - b.rating); // Lowest rating first
-                    break;
-                case 'titleAsc':
-                    watchedItems.sort((a, b) => {
-                        const titleA = allMoviesData[a.id]?.title || allMoviesData[a.id]?.name || '';
-                        const titleB = allMoviesData[b.id]?.title || allMoviesData[b.id]?.name || '';
-                        return titleA.localeCompare(titleB); // Alphabetical A-Z
-                    });
-                    break;
-                case 'titleDesc':
-                    watchedItems.sort((a, b) => {
-                        const titleA = allMoviesData[a.id]?.title || allMoviesData[a.id]?.name || '';
-                        const titleB = allMoviesData[b.id]?.title || allMoviesData[b.id]?.name || '';
-                        return titleB.localeCompare(titleA); // Alphabetical Z-A
-                    });
-                    break;
-                case 'releaseDateDesc':
-                    watchedItems.sort((a, b) => {
-                        const movieA = allMoviesData[a.id];
-                        const movieB = allMoviesData[b.id];
-                        const dateA = movieA?.year || (movieA?.first_air_date ? new Date(movieA.first_air_date).getFullYear() : 0);
-                        const dateB = movieB?.year || (movieB?.first_air_date ? new Date(movieB.first_air_date).getFullYear() : 0);
-                        return dateB - dateA; // Newest Release Date first
-                    });
-                    break;
-                case 'releaseDateAsc':
-                    watchedItems.sort((a, b) => {
-                        const movieA = allMoviesData[a.id];
-                        const movieB = allMoviesData[b.id];
-                        const dateA = movieA?.year || (movieA?.first_air_date ? new Date(movieA.first_air_date).getFullYear() : 0);
-                        const dateB = movieB?.year || (movieB?.first_air_date ? new Date(movieB.first_air_date).getFullYear() : 0);
-                        return dateA - dateB; // Oldest Release Date first
-                    });
-                    break;
-            }
-
-
+        function displayWatchedContent(watchedItems) {
+            const container = document.getElementById('watchedContentList');
             if (watchedItems.length === 0) {
-                watchedContentListDiv.innerHTML = '<div class="empty-list">No watched content yet.</div>';
+                container.innerHTML = '<div class="empty-list">No watched content yet.</div>';
                 return;
             }
 
-            const html = watchedItems.map(interaction => { 
-                const movie = allMoviesData[interaction.id];
-                if (!movie) return ''; 
+            // Sort by watched date, newest first
+            watchedItems.sort((a, b) => new Date(b.watchedDate) - new Date(a.watchedDate));
 
-                const title = movie.title || movie.name || 'Unknown';
-                const posterUrl = movie.posterUrl || 'https://placehold.co/150x225/cccccc/000000?text=No+Poster';
-
-                return `
-                    <div class="movie-list-item">
-                        <img src="${posterUrl}" alt="${title} poster">
-                        <p>${title}</p>
-                        ${interaction.watchedDate ? `<p style="font-size: 0.7em; color: #888;">Watched: ${interaction.watchedDate}</p>` : ''}
-                        ${interaction.rating > 0 ? `<p style="font-size: 0.7em; color: #888;">Rating: ${interaction.rating}★</p>` : ''}
-                    </div>
-                `;
-            }).join('');
-
-            watchedContentListDiv.innerHTML = html;
+            container.innerHTML = watchedItems.map(item => renderMediaItem(item)).join('');
         }
 
-        function displayOwnedContent() {
-            const ownedContentListDiv = document.getElementById('ownedContentList');
-            let ownedMovies = myInteractions.filter(item => item.owned);
-
-            if (ownedMovies.length === 0) {
-                ownedContentListDiv.innerHTML = '<div class="empty-list">No owned content yet.</div>';
+        function displayOwnedContent(ownedItems) {
+            const container = document.getElementById('ownedContentList');
+            if (ownedItems.length === 0) {
+                container.innerHTML = '<div class="empty-list">No owned content yet.</div>';
                 return;
             }
+            
+            // Sort alphabetically
+            ownedItems.sort((a,b) => (a.title || '').localeCompare(b.title || ''));
 
-            const html = ownedMovies.slice(0, 10).map(interaction => { 
-                const movie = allMoviesData[interaction.id];
-                if (!movie) return ''; 
-
-                const title = movie.title || movie.name || 'Unknown';
-                const posterUrl = movie.posterUrl || 'https://placehold.co/150x225/cccccc/000000?text=No+Poster';
-
-                return `
-                    <div class="movie-list-item">
-                        <img src="${posterUrl}" alt="${title} poster">
-                        <p>${title}</p>
-                    </div>
-                `;
-            }).join('');
-
-            ownedContentListDiv.innerHTML = html;
+            container.innerHTML = ownedItems.map(item => renderMediaItem(item)).join('');
         }
+        
+        function renderMediaItem(item) {
+            const title = item.title || 'Untitled';
+            const posterHTML = item.posterUrl 
+                ? `<img src="${item.posterUrl}" alt="${title}" class="media-list-poster">`
+                : `<div class="no-poster-small"></div>`;
 
-        // --- Other functions (copied for consistency) ---
-        function redirectToAuth() {
-            window.location.href = 'auth.html';
+            return `
+                <a href="library.html?id=${item.id}" class="media-list-item">
+                    ${posterHTML}
+                    <p>${title}</p>
+                </a>
+            `;
         }
     </script>
 </body>

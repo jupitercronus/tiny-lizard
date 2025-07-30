@@ -57,7 +57,10 @@
             background: rgba(255, 255, 255, 0.1);
         }
         
-        .logout-btn { 
+        .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; transition: background-color 0.3s ease; }
+        .add-media-btn:hover { background: #0056b3; }
+        
+        .auth-btn { 
             background: #dc3545;
             color: white;
             padding: 8px 16px;
@@ -69,7 +72,7 @@
             transition: background-color 0.3s ease;
         }
 
-        .logout-btn:hover { 
+        .auth-btn:hover { 
             background: #c82333;
         }
 
@@ -247,7 +250,8 @@
                 <a href="index.html" class="nav-link">Library</a>
                 <a href="lists.html" class="nav-link">Lists</a> 
                 <a href="profile.html" class="nav-link">Profile</a>
-                <button id="authBtn" class="logout-btn">Login</button>
+                <a href="add-movie.html" class="add-media-btn">+ Add Media</a>
+                <button id="authBtn" class="auth-btn">Login</button>
             </div>
         </div>
     </nav>

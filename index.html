@@ -37,10 +37,40 @@
         .media-card-content { flex-grow: 1; display: flex; flex-direction: column; }
         .media-title { font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 8px; cursor: pointer; }
         .media-year { color: #666; font-size: 0.9em; margin-bottom: 12px; }
-        .media-actions { margin-top: auto; padding-top: 15px; }
-        .btn-details { background: #007bff; color: white; text-decoration: none; padding: 8px 16px; border-radius: 5px; display: inline-block; transition: background-color 0.3s ease; }
-        .btn-details:hover { background: #0056b3; }
+        
+        /* Styles for user-specific details on cards */
+        .media-rating { display: flex; gap: 3px; margin-bottom: 12px; }
+        .star { color: #ffc107; font-size: 1.1em; }
+        .star.empty { color: #ddd; }
+        .media-status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; margin-bottom: 12px; }
+        .watched { background: #d4edda; color: #155724; }
+        .unwatched { background: #f8d7da; color: #721c24; }
+        .owned-badge { background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600; margin-left: 8px; display: inline-block; vertical-align: middle; }
+        
+        .media-public-details { font-size: 0.85em; color: #666; line-height: 1.4; margin-bottom: 15px; }
+        .media-public-details div { margin-bottom: 4px; }
+
+        .media-actions { margin-top: auto; padding-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .btn-details, .btn-small { text-decoration: none; padding: 8px 12px; border-radius: 5px; display: inline-block; transition: background-color 0.3s ease; border: none; cursor: pointer; font-size: 14px; }
+        .btn-details { background: #6c757d; color: white; }
+        .btn-details:hover { background: #5a6268; }
+        .btn-small.btn-edit { background: #007bff; color: white; }
+        .btn-small.btn-edit:hover { background: #0056b3; }
+        .btn-small.btn-delete { background: #dc3545; color: white; }
+        .btn-small.btn-delete:hover { background: #c82333; }
+        .btn-small.btn-add { background: #28a745; color: white; }
+        .btn-small.btn-add:hover { background: #218838; }
+
         .empty-state { text-align: center; padding: 80px 20px; color: #666; }
+        
+        /* Modal Styles for confirmation */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border: 1px solid #888; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19); text-align: center; }
+        .modal-buttons { display: flex; justify-content: center; gap: 15px; }
+        .modal-btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .modal-btn.confirm { background: #dc3545; color: white; }
+        .modal-btn.cancel { background: #6c757d; color: white; }
+
     </style>
 </head>
 <body>
@@ -78,6 +108,18 @@
             </div>
         </div>
     </div>
+    
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <h3 id="confirmationModalTitle">Confirm Action</h3>
+            <p id="confirmationModalMessage">Are you sure?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" id="confirmModalYes">Yes</button>
+                <button class="modal-btn cancel" id="confirmModalNo">No</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         // --- Firebase Initialization ---
@@ -124,9 +166,9 @@
                 const mediaSnapshot = await db.collection('movies').orderBy('dateAdded', 'desc').get();
                 allMedia = mediaSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+                myInteractions = {}; // Reset interactions
                 if (currentUser) {
                     const interactionsSnapshot = await db.collection('users').doc(currentUser.uid).collection('movieInteractions').get();
-                    myInteractions = {};
                     interactionsSnapshot.forEach(doc => {
                         myInteractions[doc.id] = doc.data();
                     });
@@ -164,25 +206,120 @@
 
             container.innerHTML = mediaToDisplay.map(media => {
                 const title = media.title || 'Untitled';
+                const interaction = myInteractions[media.id];
+                
+                // Always show public details
+                const publicDetailsHTML = `
+                    <div class="media-public-details">
+                        ${media.director ? `<div><strong>Director:</strong> ${media.director}</div>` : ''}
+                        ${media.genre ? `<div><strong>Genre:</strong> ${media.genre}</div>` : ''}
+                        ${media.cast && Array.isArray(media.cast) && media.cast.length > 0 ? `<div><strong>Cast:</strong> ${media.cast.slice(0,2).join(', ')}...</div>` : ''}
+                    </div>
+                `;
+
+                let userDetailsHTML = '';
+                let actionsHTML = '';
+
+                if (currentUser && interaction) {
+                    // Logged in, and it's in their collection
+                    userDetailsHTML = `
+                        ${interaction.rating > 0 ? `<div class="media-rating">${generateStarDisplay(interaction.rating)}</div>` : ''}
+                        <div class="media-status ${interaction.watched ? 'watched' : 'unwatched'}">
+                            ${interaction.watched ? '✓ Watched' : '○ Not Watched'}
+                        </div>
+                    `;
+                    actionsHTML = `
+                        <div class="media-actions">
+                            <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
+                            <button class="btn-small btn-edit" onclick="editMovie('${media.id}')">Edit</button>
+                            <button class="btn-small btn-delete" onclick="deleteMovie('${media.id}')">Remove</button>
+                        </div>
+                    `;
+                } else if (currentUser && !interaction) {
+                    // Logged in, but NOT in their collection
+                    actionsHTML = `
+                        <div class="media-actions">
+                             <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
+                             <button class="btn-small btn-add" onclick="addExistingMovieToMyCollection('${media.id}')">Add to My Media</button>
+                        </div>
+                    `;
+                } else {
+                    // Logged out
+                    actionsHTML = `
+                        <div class="media-actions">
+                            <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
+                        </div>
+                    `;
+                }
+
                 return `
                     <div class="media-card">
                         <div class="media-poster" onclick="viewMediaDetails('${media.id}')">
                             ${media.posterUrl ? `<img src="${media.posterUrl}" alt="${title} poster" loading="lazy">` : '<div class="no-poster">No Poster</div>'}
                         </div>
                         <div class="media-card-content">
-                            <h3 class="media-title" onclick="viewMediaDetails('${media.id}')">${title}</h3>
+                            <h3 class="media-title" onclick="viewMediaDetails('${media.id}')">
+                                ${title}
+                                ${interaction && interaction.owned ? '<span class="owned-badge">Owned</span>' : ''}
+                            </h3>
                             <p class="media-year">${media.year || ''}</p>
-                            <div class="media-actions">
-                                <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
-                            </div>
+                            
+                            ${publicDetailsHTML}
+                            ${userDetailsHTML}
+                            ${actionsHTML}
                         </div>
                     </div>
                 `;
             }).join('');
         }
+        
+        function generateStarDisplay(rating) {
+            let stars = '';
+            for (let i = 1; i <= 5; i++) {
+                stars += `<span class="star ${i <= rating ? '' : 'empty'}">★</span>`;
+            }
+            return stars;
+        }
 
         function viewMediaDetails(mediaId) {
             window.location.href = `library.html?id=${mediaId}`;
+        }
+        
+        function editMovie(mediaId) {
+            window.location.href = `add-movie.html?edit=${mediaId}`;
+        }
+
+        function addExistingMovieToMyCollection(mediaId) {
+            // This is just a shortcut to the edit page where they can add their details
+            window.location.href = `add-movie.html?edit=${mediaId}`;
+        }
+        
+        function showConfirmationModal(title, message, onConfirm) {
+            const modal = document.getElementById('confirmationModal');
+            document.getElementById('confirmationModalTitle').textContent = title;
+            document.getElementById('confirmationModalMessage').textContent = message;
+            modal.style.display = 'flex'; 
+
+            const yesBtn = document.getElementById('confirmModalYes');
+            const noBtn = document.getElementById('confirmModalNo');
+
+            yesBtn.onclick = () => { modal.style.display = 'none'; onConfirm(true); };
+            noBtn.onclick = () => { modal.style.display = 'none'; onConfirm(false); };
+        }
+
+        async function deleteMovie(mediaId) { 
+            showConfirmationModal('Remove From Collection', 'Are you sure you want to remove this from your personal collection? This will delete your rating and review.', async (confirmed) => { 
+                if (confirmed && currentUser) {
+                    try {
+                        await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(mediaId).delete();
+                        // We don't show an alert, we just reload the data which will make the card update
+                        loadAllMedia();
+                    } catch (error) {
+                        console.error('Error removing interaction from Firestore:', error);
+                        alert('Error: Could not remove item.');
+                    }
+                }
+            });
         }
     </script>
 </body>

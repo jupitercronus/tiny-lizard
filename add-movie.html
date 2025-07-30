@@ -61,7 +61,7 @@
         .nav-link.active { background: #007bff; }
         .nav-link:hover { background: rgba(255, 255, 255, 0.1); }
         
-        .logout-btn {
+        .auth-btn {
             background: #dc3545;
             color: white;
             padding: 8px 16px;
@@ -72,7 +72,7 @@
             border: none;
             transition: background-color 0.3s ease;
         }
-        .logout-btn:hover { background: #c82333; }
+        .auth-btn:hover { background: #c82333; }
 
         .container {
             background: white;
@@ -199,7 +199,7 @@
                     <a href="lists.html" class="nav-link">Lists</a> 
                     <a href="profile.html" class="nav-link">Profile</a> 
                     <a href="add-movie.html" class="nav-link active">Add Media</a>
-                    <button id="logoutBtn" class="logout-btn">Logout</button>
+                    <button id="authBtn" class="auth-btn">Logout</button>
                 </div>
             </div>
     </nav>
@@ -223,7 +223,6 @@
         
         <h3>✏️ Media Details</h3>
         <form id="movieForm">
-            <!-- Hidden input to store UPC product title for physical copy tracking -->
             <input type="hidden" id="editionDetailsInput">
 
             <div class="form-row">
@@ -237,6 +236,17 @@
                 </div>
             </div>
             
+             <div class="form-row">
+                <div class="form-group">
+                    <label for="director">Director</label>
+                    <input type="text" id="director" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="genre">Genre</label>
+                    <input type="text" id="genre" readonly>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="summary">Summary</label>
                 <textarea id="summary" rows="6" placeholder="Media summary from TMDb" readonly></textarea>
@@ -245,6 +255,14 @@
             <div class="form-group">
                 <label for="cast">Cast</label>
                 <input type="text" id="cast" placeholder="e.g., Leonardo DiCaprio, Joseph Gordon-Levitt" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="contentType">Content Type *</label>
+                <select id="contentType" required>
+                    <option value="movie">Movie</option>
+                    <option value="tv">TV Show</option>
+                </select>
             </div>
 
             <h3>✏️ My Rating & Notes</h3>
@@ -302,18 +320,15 @@
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
 
     <script>
-        // Global variables
         let currentRating = 0;
         let editingMovieId = null; 
         let currentUser = null; 
         let isPublicFieldsEditable = true;
         
-        // API configuration
         const TMDB_BASE_URL = '/api/tmdb';
         const UPC_BASE_URL = '/api/upc';
         const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
-        // --- Firebase Initialization ---
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
           authDomain: "tiny-lizard.firebaseapp.com",
@@ -321,30 +336,39 @@
           storageBucket: "tiny-lizard.firebasestorage.app",
           messagingSenderId: "250872474692",
           appId: "1:250872474692:web:969e0b1302ae3cb4666011",
-          measurementId: "G-43FM6WR90B"
         };
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore(); 
         const auth = firebase.auth(); 
-        // --- End Firebase Initialization ---
 
         document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(user => {
+                const authBtn = document.getElementById('authBtn');
                 if (user) {
                     currentUser = user;
-                    console.log('User logged in:', user.uid);
+                    authBtn.textContent = 'Logout';
                     initializePage();
                 } else {
+                    authBtn.textContent = 'Login';
                     window.location.href = 'auth.html'; 
                 }
             });
+            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
         });
+
+        async function handleAuthButtonClick() {
+            if (currentUser) {
+                await auth.signOut();
+            } else {
+                window.location.href = 'auth.html';
+            }
+        }
 
         function initializePage() {
             setupForm();
             setupSearch();
             setupStarRating();
-            setupBarcodeScanner(); // Your existing scanner setup
+            setupBarcodeScanner();
             checkEditMode();
             
             document.getElementById('ownedCheckbox').addEventListener('change', (e) => {
@@ -352,7 +376,6 @@
             });
         }
 
-        // --- Form & Submission Logic ---
         function setupForm() {
             const form = document.getElementById('movieForm');
             form.addEventListener('submit', (e) => {
@@ -374,12 +397,10 @@
                 const tmdbId = document.getElementById('movieForm').dataset.tmdbId;
                 let movieDocRef;
 
-                // Step 1: Find or Create the main media document
                 if (tmdbId) {
                     const existingQuery = await db.collection('movies').where('tmdbId', '==', parseInt(tmdbId)).limit(1).get();
                     if (!existingQuery.empty) {
                         movieDocRef = existingQuery.docs[0].ref;
-                        console.log("Found existing media document:", movieDocRef.id);
                     }
                 }
                 
@@ -390,32 +411,29 @@
                         director: document.getElementById('director').value,
                         genre: document.getElementById('genre').value,
                         posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
-                        runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null,
+                        runtime: document.getElementById('movieForm').dataset.runtime || null,
                         tmdbId: tmdbId ? parseInt(tmdbId) : null,
                         overview: document.getElementById('summary').value,
                         cast: document.getElementById('cast').value.split(',').map(c => c.trim()),
+                        contentType: document.getElementById('contentType').value,
                         dateAdded: firebase.firestore.FieldValue.serverTimestamp(),
                         originalUploaderId: currentUser.uid,
                         originalUploaderDisplayName: currentUser.displayName || currentUser.email,
                         isManualEntry: isPublicFieldsEditable
                     };
                     movieDocRef = await db.collection('movies').add(mainMediaData);
-                    console.log("Created new media document:", movieDocRef.id);
                 }
 
-                // Step 2: Create the user's interaction document
                 const userInteractionData = {
                     rating: currentRating,
                     review: document.getElementById('review').value,
                     watched: document.getElementById('watchedCheckbox').checked,
                     watchedDate: document.getElementById('watchedDate').value || null,
-                    owned: document.getElementById('ownedCheckbox').checked, // Still useful for user's profile page
+                    owned: document.getElementById('ownedCheckbox').checked,
                     interactionDate: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieDocRef.id).set(userInteractionData);
-                console.log("Created user interaction document.");
 
-                // Step 3: If owned, create a physical copy document
                 if (document.getElementById('ownedCheckbox').checked) {
                     const physicalCopyData = {
                         ownerId: currentUser.uid,
@@ -424,7 +442,6 @@
                         dateAdded: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     await movieDocRef.collection('physicalCopies').add(physicalCopyData);
-                    console.log("Created physical copy document.");
                 }
 
                 showAlertModal('Success', 'Media added to the library!', () => {
@@ -441,14 +458,13 @@
         }
         
         async function updateMedia() {
-             const submitBtn = document.getElementById('submitBtn');
+            const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Updating...';
 
             try {
                 const movieDocRef = db.collection('movies').doc(editingMovieId);
 
-                // Step 1: Update the user's interaction document (this is the primary action on edit)
                 const userInteractionData = {
                     rating: currentRating,
                     review: document.getElementById('review').value,
@@ -458,15 +474,12 @@
                     interactionDate: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(editingMovieId).set(userInteractionData, { merge: true });
-                console.log("Updated user interaction document.");
 
-                // Step 2: Check and update physical copy status
                 const ownedCheckbox = document.getElementById('ownedCheckbox');
                 const physicalCopiesRef = movieDocRef.collection('physicalCopies');
                 const myCopyQuery = await physicalCopiesRef.where('ownerId', '==', currentUser.uid).get();
 
                 if (ownedCheckbox.checked && myCopyQuery.empty) {
-                    // User now owns it, but no record exists -> Add one
                     const physicalCopyData = {
                         ownerId: currentUser.uid,
                         ownerDisplayName: currentUser.displayName || currentUser.email,
@@ -474,20 +487,15 @@
                         dateAdded: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     await physicalCopiesRef.add(physicalCopyData);
-                    console.log("Added new physical copy document for existing media.");
                 } else if (!ownedCheckbox.checked && !myCopyQuery.empty) {
-                    // User no longer owns it, but a record exists -> Delete it
                     for (const doc of myCopyQuery.docs) {
                         await doc.ref.delete();
                     }
-                    console.log("Deleted physical copy document(s).");
                 } else if (ownedCheckbox.checked && !myCopyQuery.empty) {
-                    // User still owns it, record exists -> Update edition details if changed
                     const copyDoc = myCopyQuery.docs[0];
                     const newEditionDetails = document.getElementById('editionDetails').value;
                     if (copyDoc.data().editionDetails !== newEditionDetails) {
                         await copyDoc.ref.update({ editionDetails: newEditionDetails });
-                        console.log("Updated physical copy edition details.");
                     }
                 }
 
@@ -507,7 +515,10 @@
         async function checkEditMode() {
             const urlParams = new URLSearchParams(window.location.search);
             editingMovieId = urlParams.get('edit');
-            if (!editingMovieId) return;
+            if (!editingMovieId) {
+                togglePublicFieldsReadonly(false);
+                return;
+            };
 
             document.getElementById('formTitle').textContent = 'Edit My Details';
             document.getElementById('submitBtn').textContent = 'Update Details';
@@ -520,15 +531,16 @@
                 return;
             }
 
-            // Populate main fields (always read-only in edit mode)
             const mediaData = mediaDoc.data();
             document.getElementById('title').value = mediaData.title || '';
             document.getElementById('year').value = mediaData.year || '';
+            document.getElementById('director').value = mediaData.director || '';
+            document.getElementById('genre').value = mediaData.genre || '';
             document.getElementById('summary').value = mediaData.overview || '';
             document.getElementById('cast').value = (mediaData.cast || []).join(', ');
+            document.getElementById('contentType').value = mediaData.contentType || 'movie';
             togglePublicFieldsReadonly(true);
 
-            // Populate user's interaction fields
             if (interactionDoc.exists) {
                 const interactionData = interactionDoc.data();
                 currentRating = interactionData.rating || 0;
@@ -548,70 +560,109 @@
             }
         }
         
-        // --- Barcode & Search Logic (Simplified for brevity, assuming existing functions) ---
-        // NOTE: Your existing setupBarcodeScanner, performSearch, selectMovie functions go here.
-        // I will add the critical modification to lookupMovieByBarcode.
-        
-        // Dummy functions to avoid errors if you copy-paste just this.
-        // Replace these with your actual functions.
-        function setupSearch() { /* Your search setup */ }
-        function setupStarRating() { /* Your star rating setup */ }
-        function setupBarcodeScanner() { /* Your barcode setup */ }
+        function setupSearch() {
+            const searchInput = document.getElementById('movieSearch');
+            let searchTimeout;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                const query = searchInput.value.trim();
+                if (query.length > 2) {
+                    searchTimeout = setTimeout(() => performSearch(query), 300);
+                } else {
+                    document.getElementById('searchResults').innerHTML = '';
+                }
+            });
+            document.getElementById('searchBtn').addEventListener('click', () => performSearch(searchInput.value.trim()));
+        }
+
+        async function performSearch(query) {
+            if (!query) return;
+            showStatusMessage('Searching...', 'info');
+            try {
+                const movieSearchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`;
+                const tvSearchUrl = `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(query)}`;
+
+                const [movieResponse, tvResponse] = await Promise.all([
+                    fetch(movieSearchUrl),
+                    fetch(tvSearchUrl)
+                ]);
+
+                const movieData = await movieResponse.json();
+                const tvData = await tvResponse.json();
+
+                const combinedResults = [
+                    ...movieData.results.map(item => ({...item, media_type: 'movie'})),
+                    ...tvData.results.map(item => ({...item, media_type: 'tv'}))
+                ].sort((a, b) => b.popularity - a.popularity);
+
+                displayResults(combinedResults);
+            } catch (error) {
+                console.error("Search error:", error);
+                showStatusMessage('Search failed.', 'error');
+            }
+        }
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('searchResults');
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<p>No results found.</p>';
+                return;
+            }
+            resultsDiv.innerHTML = results.slice(0, 10).map(item => {
+                const title = item.title || item.name;
+                const year = (item.release_date || item.first_air_date || '').substring(0, 4);
+                const type = item.media_type === 'tv' ? 'TV Show' : 'Movie';
+                return `
+                    <div class="search-result" onclick="selectMedia('${item.id}', '${item.media_type}')">
+                        <img src="${item.poster_path ? TMDB_IMAGE_BASE + item.poster_path : ''}" class="search-result-poster" onerror="this.style.display='none'">
+                        <div class="search-result-info">
+                            <h4>${title} (${year}) <span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px;">${type}</span></h4>
+                            <p>${item.overview.substring(0, 100)}...</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function selectMedia(id, type) {
+            showStatusMessage('Loading details...', 'info');
+            document.getElementById('searchResults').innerHTML = '';
+            try {
+                const response = await fetch(`${TMDB_BASE_URL}/${type}/${id}?append_to_response=credits`);
+                const data = await response.json();
+
+                document.getElementById('title').value = data.title || data.name;
+                document.getElementById('year').value = (data.release_date || data.first_air_date || '').substring(0, 4);
+                document.getElementById('summary').value = data.overview;
+                document.getElementById('genre').value = data.genres.map(g => g.name).join(', ');
+                document.getElementById('cast').value = data.credits.cast.slice(0, 5).map(c => c.name).join(', ');
+                const director = data.credits.crew.find(c => c.job === 'Director');
+                document.getElementById('director').value = director ? director.name : '';
+                document.getElementById('contentType').value = type;
+                
+                document.getElementById('movieForm').dataset.tmdbId = data.id;
+                document.getElementById('movieForm').dataset.posterUrl = data.poster_path ? TMDB_IMAGE_BASE + data.poster_path : '';
+                document.getElementById('movieForm').dataset.runtime = data.runtime || (data.episode_run_time ? data.episode_run_time[0] : null);
+
+                togglePublicFieldsReadonly(true);
+                isPublicFieldsEditable = false;
+            } catch (error) {
+                console.error("Error selecting media:", error);
+                showStatusMessage('Could not load details.', 'error');
+            }
+        }
+
+        function setupBarcodeScanner() { /* Your full barcode scanner setup code */ }
+        function setupStarRating() { /* Your full star rating setup code */ }
         function updateStars() { /* Your star update logic */ }
-        function togglePublicFieldsReadonly(isReadonly) { /* Your readonly toggle logic */ }
+        function togglePublicFieldsReadonly(isReadonly) {
+             const fields = ['title', 'year', 'director', 'genre', 'summary', 'cast'];
+             fields.forEach(id => document.getElementById(id).readOnly = isReadonly);
+        }
         function showAlertModal(title, message, onOk = () => {}) { 
             alert(`${title}\n${message}`);
             onOk();
         }
-        
-        async function lookupMovieByBarcode(barcode) {
-            // This function now uses the /api/upc proxy
-            showStatusMessage(`Looking up barcode: ${barcode}...`, 'info');
-            try {
-                const upcResponse = await fetch(`${UPC_BASE_URL}?upc=${barcode}`);
-                if (!upcResponse.ok) throw new Error(`UPC lookup failed: ${upcResponse.statusText}`);
-                const upcData = await upcResponse.json();
-
-                if (!upcData.items || upcData.items.length === 0) {
-                    showAlertModal('Barcode Not Found', `No product found for barcode: ${barcode}.`);
-                    return;
-                }
-                
-                const product = upcData.items[0];
-                const productName = product.title || 'Unknown Product';
-                
-                // *** CRITICAL CHANGE: Store the specific edition title ***
-                document.getElementById('editionDetailsInput').value = productName;
-                document.getElementById('editionDetails').value = productName; // Also set the visible one
-                
-                showStatusMessage(`Found: ${productName}. Searching TMDb...`, 'info');
-                
-                const movieTitle = extractMovieTitle(productName);
-                await performSearch(movieTitle); // Assume performSearch selects the first result
-
-            } catch (error) {
-                console.error('Barcode lookup error:', error);
-                showAlertModal('Lookup Error', `An error occurred: ${error.message}.`);
-            }
-        }
-        
-        function extractMovieTitle(productName) {
-            // Your existing title extraction logic
-            let title = productName;
-            title = title.replace(/\b(DVD|Blu-ray|4K|UHD|Digital|Copy|Widescreen|Full Screen)\b/gi, '');
-            title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); 
-            title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim();
-            return title.trim() || productName;
-        }
-        
-        async function performSearch(query) {
-            // Your existing performSearch logic, which should call selectMovie
-        }
-        
-        async function selectMovie(tmdbId) {
-            // Your existing selectMovie logic to populate the form from TMDb
-        }
-
     </script>
 </body>
 </html>

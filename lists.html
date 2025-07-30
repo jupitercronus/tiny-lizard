@@ -6,16 +6,84 @@
     <title>Lists - Coming Soon</title>
     <style>
         body {
-            background-color: #031d25;
+            background-color: #f5f5f5;
+            color: #333;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+        .navbar {
+            background: #333;
+            padding: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .logo {
+            font-size: 1.8em;
+            font-weight: bold;
             color: white;
-            font-family: "Courier New", Courier, monospace;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-link.active {
+            background: #007bff;
+        }
+        
+        .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; transition: background-color 0.3s ease; }
+        .add-media-btn:hover { background: #0056b3; }
+        
+        .auth-btn { 
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .auth-btn:hover { 
+            background: #c82333;
+        }
+        .container {
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            font-size: 2em;
+            height: calc(100vh - 70px);
             text-align: center;
+        }
+        .container h1 {
+            font-size: 3em;
+            color: #ccc;
         }
     </style>
 </head>
@@ -24,19 +92,46 @@
         <div class="nav-container">
             <a href="index.html" class="logo">the library sale</a>
             <div class="nav-links">
-                <a href="index.html" class="nav-link active">Library</a>
-                <a href="profile.html" class="nav-link">Profile</a> 
-                <a id="addMovieNavbarBtn" href="add-movie.html" class="add-movie-btn">+ Add Movie</a> 
-                <button id="logoutBtn" class="logout-btn">Logout</button>
+                <a href="index.html" class="nav-link">Library</a>
+                <a href="lists.html" class="nav-link active">Lists</a> 
+                <a href="profile.html" class="nav-link">Profile</a>
+                <a href="add-movie.html" class="add-media-btn">+ Add Media</a> 
+                <button id="authBtn" class="auth-btn">Login</button>
             </div>
         </div>
     </nav>
     <div class="container">
-        404 
-        <br>
-            coming soon
-        <br>
-        i'm sorry
+        <h1>Coming Soon</h1>
     </div>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <script>
+        // Basic auth handling for login/logout button state
+        const firebaseConfig = {
+          apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
+          authDomain: "tiny-lizard.firebaseapp.com",
+          projectId: "tiny-lizard",
+          storageBucket: "tiny-lizard.firebasestorage.app",
+          messagingSenderId: "250872474692",
+          appId: "1:250872474692:web:969e0b1302ae3cb4666011"
+        };
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        let currentUser = null;
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            const authBtn = document.getElementById('authBtn');
+            authBtn.textContent = user ? 'Logout' : 'Login';
+        });
+
+        document.getElementById('authBtn').addEventListener('click', () => {
+            if(currentUser) {
+                auth.signOut();
+            } else {
+                window.location.href = 'auth.html';
+            }
+        });
+    </script>
 </body>
 </html>
