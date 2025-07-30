@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Details - the library sale</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+
+        .navbar {
+            background: #333;
+            padding: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .logo {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .logout-btn { 
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .logout-btn:hover { 
+            background: #c82333;
+        }
+
+        .main-container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 30px 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .media-layout {
+            display: flex;
+            gap: 30px;
+        }
+
+        .media-poster {
+            flex-shrink: 0;
+            width: 250px;
+        }
+
+        .media-poster img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .no-poster {
+            width: 250px;
+            height: 375px;
+            background: #f0f0f0;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #999;
+            text-align: center;
+        }
+
+        .media-info {
+            flex-grow: 1;
+        }
+
+        .media-title {
+            font-size: 2.8em;
+            font-weight: bold;
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+
+        .media-tagline {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .media-details p {
+            margin: 0 0 8px 0;
+            color: #444;
+        }
+        .media-details strong {
+            color: #000;
+        }
+        
+        .media-summary {
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        
+        .section-divider {
+            border: 0;
+            height: 1px;
+            background: #eee;
+            margin: 30px 0;
+        }
+        
+        .section-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        /* My Interaction Section */
+        .my-interaction-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .star-rating {
+            display: flex;
+            gap: 3px;
+            margin-bottom: 12px;
+        }
+
+        .star {
+            color: #ffc107;
+            font-size: 1.5em;
+        }
+
+        .star.empty {
+            color: #ddd;
+        }
+        
+        .btn-edit {
+            background: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-edit:hover {
+            background: #0056b3;
+        }
+
+        /* Physical Copies Section */
+        .physical-copies-list {
+            list-style: none;
+            padding: 0;
+        }
+        .physical-copy-item {
+            background: #fff;
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .copy-details {
+            font-weight: bold;
+        }
+        .copy-owner {
+            color: #555;
+            font-size: 0.9em;
+        }
+        
+        .loading-state, .error-state {
+            text-align: center;
+            font-size: 1.2em;
+            color: #666;
+            padding: 50px 0;
+        }
+
+        @media (max-width: 768px) {
+            .media-layout {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            .media-poster {
+                width: 80%;
+                max-width: 250px;
+            }
+            .media-title {
+                font-size: 2.2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">the library sale</a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Library</a>
+                <a href="lists.html" class="nav-link">Lists</a> 
+                <a href="profile.html" class="nav-link">Profile</a>
+                <button id="authBtn" class="logout-btn">Login</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container" id="mainContainer">
+        <!-- Content will be dynamically loaded here -->
+        <div class="loading-state">
+            <h2>Loading Media Details...</h2>
+        </div>
+    </div>
+
+    <script>
+        // --- Firebase Initialization ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
+          authDomain: "tiny-lizard.firebaseapp.com",
+          projectId: "tiny-lizard",
+          storageBucket: "tiny-lizard.firebasestorage.app",
+          messagingSenderId: "250872474692",
+          appId: "1:250872474692:web:969e0b1302ae3cb4666011",
+          measurementId: "G-43FM6WR90B"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore(); 
+        const auth = firebase.auth(); 
+        // --- End Firebase Initialization ---
+
+        let currentUser = null;
+        let mediaId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            mediaId = urlParams.get('id');
+
+            if (!mediaId) {
+                displayError("No media ID provided in the URL.");
+                return;
+            }
+
+            auth.onAuthStateChanged(user => {
+                currentUser = user;
+                const authBtn = document.getElementById('authBtn');
+                if (user) {
+                    authBtn.textContent = 'Logout';
+                } else {
+                    authBtn.textContent = 'Login';
+                }
+                loadMediaData();
+            });
+            
+            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
+        });
+        
+        async function handleAuthButtonClick() {
+            if (currentUser) {
+                await auth.signOut();
+                window.location.reload(); // Reload to reflect logged-out state
+            } else {
+                window.location.href = 'auth.html';
+            }
+        }
+
+        async function loadMediaData() {
+            try {
+                // --- Fetch all data in parallel for efficiency ---
+                const [mediaDoc, physicalCopiesSnapshot, interactionDoc] = await Promise.all([
+                    db.collection('movies').doc(mediaId).get(),
+                    db.collection('movies').doc(mediaId).collection('physicalCopies').get(),
+                    currentUser ? db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(mediaId).get() : Promise.resolve(null)
+                ]);
+
+                if (!mediaDoc.exists) {
+                    displayError("Media not found in the database.");
+                    return;
+                }
+
+                const mediaData = mediaDoc.data();
+                const myInteraction = interactionDoc && interactionDoc.exists ? interactionDoc.data() : null;
+                
+                const physicalCopies = [];
+                physicalCopiesSnapshot.forEach(doc => {
+                    physicalCopies.push(doc.data());
+                });
+
+                renderMediaPage(mediaData, myInteraction, physicalCopies);
+
+            } catch (error) {
+                console.error("Error loading media data:", error);
+                displayError("An error occurred while loading the media data. Please try again.");
+            }
+        }
+
+        function renderMediaPage(mediaData, myInteraction, physicalCopies) {
+            const container = document.getElementById('mainContainer');
+            const title = mediaData.title || mediaData.name || "Untitled";
+            
+            let myInteractionHTML = '';
+            if (currentUser) {
+                if (myInteraction) {
+                    myInteractionHTML = `
+                        <div class="my-interaction-section">
+                            <h3 class="section-title">My Rating & Notes</h3>
+                            <div class="star-rating">${generateStarDisplay(myInteraction.rating)}</div>
+                            <p><strong>Status:</strong> ${myInteraction.watched ? 'Watched' : 'Not Watched'}</p>
+                            ${myInteraction.watchedDate ? `<p><strong>Watched Date:</strong> ${myInteraction.watchedDate}</p>` : ''}
+                            <p><strong>My Notes:</strong> ${myInteraction.review || '<em>No notes added.</em>'}</p>
+                            <button class="btn-edit" onclick="editMyInteraction()">Edit My Details</button>
+                        </div>
+                    `;
+                } else {
+                     myInteractionHTML = `
+                        <div class="my-interaction-section">
+                            <h3 class="section-title">Add to Your Collection</h3>
+                            <p>You haven't added this media to your personal collection yet.</p>
+                            <button class="btn-edit" onclick="editMyInteraction()">Add Rating & Notes</button>
+                        </div>
+                    `;
+                }
+            }
+
+            let physicalCopiesHTML = '';
+            if (physicalCopies.length > 0) {
+                const listItems = physicalCopies.map(copy => `
+                    <li class="physical-copy-item">
+                        <span class="copy-details">${copy.editionDetails || 'Standard Edition'}</span>
+                        <span class="copy-owner">Owned by: ${copy.ownerDisplayName || 'Unknown'}</span>
+                    </li>
+                `).join('');
+
+                physicalCopiesHTML = `
+                    <div>
+                        <h3 class="section-title">Physical Copies (${physicalCopies.length} total)</h3>
+                        <ul class="physical-copies-list">${listItems}</ul>
+                    </div>
+                `;
+            } else {
+                 physicalCopiesHTML = `
+                    <div>
+                        <h3 class="section-title">Physical Copies</h3>
+                        <p>There are no physical copies of this media registered in the library yet.</p>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="media-layout">
+                    <div class="media-poster">
+                        ${mediaData.posterUrl ? `<img src="${mediaData.posterUrl}" alt="${title} poster">` : '<div class="no-poster">No Poster</div>'}
+                    </div>
+                    <div class="media-info">
+                        <h1 class="media-title">${title}</h1>
+                        ${mediaData.tagline ? `<p class="media-tagline">${mediaData.tagline}</p>` : ''}
+                        
+                        <div class="media-details">
+                            <p><strong>Year:</strong> ${mediaData.year || 'N/A'}</p>
+                            <p><strong>Director:</strong> ${mediaData.director || 'N/A'}</p>
+                            <p><strong>Genre:</strong> ${mediaData.genre || 'N/A'}</p>
+                            <p><strong>Runtime:</strong> ${mediaData.runtime ? `${mediaData.runtime} min` : 'N/A'}</p>
+                        </div>
+
+                        <div class="media-summary">
+                            <p>${mediaData.overview || 'No summary available.'}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr class="section-divider">
+                
+                ${myInteractionHTML}
+                
+                <hr class="section-divider">
+
+                ${physicalCopiesHTML}
+            `;
+        }
+        
+        function generateStarDisplay(rating) {
+            let stars = '';
+            if (!rating || rating === 0) return '<em>Not rated</em>';
+            for (let i = 1; i <= 5; i++) {
+                stars += `<span class="star ${i > rating ? 'empty' : ''}">★</span>`;
+            }
+            return stars;
+        }
+
+        function editMyInteraction() {
+            if (currentUser) {
+                window.location.href = `add-movie.html?edit=${mediaId}`;
+            } else {
+                alert("Please log in to edit your details.");
+            }
+        }
+
+        function displayError(message) {
+            const container = document.getElementById('mainContainer');
+            container.innerHTML = `
+                <div class="error-state">
+                    <h2>Error</h2>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

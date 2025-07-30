@@ -4,602 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>the library sale</title>
-    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f5f5f5;
-        }
-
-        .navbar {
-            background: #333;
-            padding: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-        }
-
-        .logo {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: white;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: white;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: background-color 0.3s ease;
-        }
-
-        .nav-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .nav-link.active {
-            background: #007bff;
-        }
-
-        .add-movie-btn {
-            background: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-        }
-
-        .add-movie-btn:hover {
-            background: #0056b3;
-        }
-        
-        .logout-btn { 
-            background: #dc3545;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            transition: background-color 0.3s ease;
-        }
-
-        .logout-btn:hover { 
-            background: #c82333;
-        }
-
-        .main-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 30px 20px;
-        }
-
-        .hero-section {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .hero-title {
-            font-size: 2.5em;
-            color: #333;
-            margin-bottom: 15px;
-            font-weight: normal;
-        }
-
-        .hero-subtitle {
-            font-size: 1.1em;
-            color: #666;
-            margin-bottom: 30px;
-        }
-
-        .controls-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .search-bar {
-            position: relative;
-            flex: 1;
-            max-width: 400px;
-        }
-
-        .search-bar input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background: white;
-            color: #333;
-            font-size: 16px;
-        }
-
-        .search-bar input:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-        }
-        
-        /* Styles for "Add to My Collection" and "Add to List" buttons */
-        .btn-add-to-my-collection { 
-            background: #007bff; 
-            color: white;
-            padding: 6px 12px;
-            font-size: 12px;
-            border-radius: 5px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.3s ease;
-            margin-right: 5px; 
-        }
-        .btn-add-to-my-collection:hover {
-            background: #0056b3;
-        }
-
-        .btn-add-to-list { 
-            background: #6c757d; 
-            color: white;
-            padding: 6px 12px;
-            font-size: 12px;
-            border-radius: 5px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.3s ease;
-        }
-        .btn-add-to-list:hover {
-            background: #5a6268;
-        }
-
-        /* NEW: Styles for dropdown filter */
-        .filter-dropdown {
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: white;
-            font-size: 16px;
-            color: #333;
-            cursor: pointer;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2C69.4L159.9%2C196.5c-1.8%2C1.8-4.7%2C1.8-6.5%2C0L25.9%2C69.4c-1.8-1.8-1.8-4.7%2C0-6.5l14.3-14.3c1.8-1.8%2C4.7-1.8%2C6.5%2C0l112.2%2C112.2l112.2-112.2c1.8-1.8%2C4.7-1.8%2C6.5%2C0l14.3%2C14.3C288.8%2C64.7%2C288.8%2C67.6%2C287%2C69.4z%22%2F%3E%3C%2Fsvg%3E');
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            background-size: 10px auto;
-            padding-right: 35px;
-        }
-
-
-        .movies-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-        }
-
-        .movie-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border: 1px solid #ddd;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .movie-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-        }
-
-        .movie-poster {
-            width: 100%;
-            height: 300px;
-            background: #f0f0f0;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-
-        .movie-poster img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .no-poster {
-            color: #999;
-            font-size: 14px;
-        }
-
-        .movie-card-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .movie-title {
-            font-size: 1.3em;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 8px;
-            cursor: pointer;
-        }
-
-        .movie-year {
-            color: #666;
-            font-size: 0.9em;
-            margin-bottom: 12px;
-        }
-
-        .movie-rating {
-            display: flex;
-            gap: 3px;
-            margin-bottom: 12px;
-        }
-
-        .star {
-            color: #ffc107;
-            font-size: 1.1em;
-        }
-
-        .star.empty {
-            color: #ddd;
-        }
-
-        .movie-status {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-
-        .watched {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .unwatched {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .owned-badge { /* NEW STYLE */
-            background: #007bff;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75em;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-
-        .movie-details {
-            font-size: 0.85em;
-            color: #666;
-            line-height: 1.4;
-            flex-grow: 1;
-        }
-        .movie-overview, .movie-cast { /* NEW STYLE */
-            margin-top: 5px;
-            font-size: 0.8em;
-        }
-        .movie-overview {
-            max-height: 4.2em; /* Approx 3 lines of text */
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-
-        .movie-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .btn-small {
-            padding: 6px 12px;
-            font-size: 12px;
-            border-radius: 5px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.3s ease;
-        }
-
-        .btn-edit {
-            background: #007bff;
-            color: white;
-        }
-
-        .btn-edit:hover {
-            background: #0056b3;
-        }
-
-        .btn-delete {
-            background: #dc3545;
-            color: white;
-        }
-
-        .btn-delete:hover {
-            background: #c82333;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 80px 20px;
-            color: #666;
-        }
-
-        .empty-state h3 {
-            font-size: 1.5em;
-            margin-bottom: 15px;
-            color: #333;
-        }
-
-        .empty-state p {
-            margin-bottom: 25px;
-        }
-
-        .empty-state .add-movie-btn {
-            display: inline-block;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
-            left: 0;
-            top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 25px;
-            border: 1px solid #888;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
-            text-align: center;
-        }
-
-        .modal-content h3 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        .modal-content p {
-            margin-bottom: 20px;
-            color: #666;
-        }
-
-        .modal-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
-        }
-
-        .modal-btn.confirm {
-            background: #dc3545;
-            color: white;
-        }
-
-        .modal-btn.confirm:hover {
-            background: #c82333;
-        }
-
-        .modal-btn.cancel {
-            background: #6c757d;
-            color: white;
-        }
-
-        .modal-btn.cancel:hover {
-            background: #5a6268;
-        }
-
-        .modal-btn.ok {
-            background: #007bff;
-            color: white;
-        }
-
-        .modal-btn.ok:hover {
-            background: #0056b3;
-        }
-
-        /* NEW: Movie Details Modal Specific Styles */
-        #movieDetailsModal .modal-content {
-            max-width: 600px; /* Larger width */
-            text-align: left; /* Align text left */
-            padding: 30px;
-            max-height: 90vh; /* Max height to allow scrolling */
-            overflow-y: auto; /* Enable scrolling for long content */
-            position: relative;
-        }
-
-        #movieDetailsModal .close-button {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            font-size: 1.5em;
-            cursor: pointer;
-            color: #333;
-            border: none;
-            background: none;
-            padding: 0;
-        }
-        #movieDetailsModal .close-button:hover {
-            color: #dc3545;
-        }
-
-        #movieDetailsModal .modal-header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        #movieDetailsModal .modal-header h2 {
-            margin: 0;
-            font-size: 2em;
-            color: #333;
-        }
-
-        #movieDetailsModal .modal-poster {
-            float: left;
-            margin-right: 20px;
-            margin-bottom: 10px;
-            width: 150px;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        #movieDetailsModal .modal-poster img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-        }
-        #movieDetailsModal .modal-poster .no-poster {
-            width: 150px;
-            height: 225px; /* Standard poster aspect ratio */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f0f0f0;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #999;
-            text-align: center;
-        }
-
-        #movieDetailsModal .modal-info {
-            overflow: hidden; /* Clear float */
-        }
-        #movieDetailsModal .modal-info p {
-            margin-bottom: 8px;
-        }
-        #movieDetailsModal .modal-info strong {
-            color: #555;
-        }
-        #movieDetailsModal .modal-overview {
-            margin-top: 15px;
-            clear: both; /* Clear float */
-        }
-        #movieDetailsModal .modal-overview h4 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-        #movieDetailsModal .modal-cast { /* NEW STYLE */
-            margin-top: 15px;
-        }
-        #movieDetailsModal .modal-cast h4 { /* NEW STYLE */
-            margin-bottom: 10px;
-            color: #333;
-        }
-        #movieDetailsModal .modal-personal-details {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
-        }
-        #movieDetailsModal .modal-personal-details h4 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-        #movieDetailsModal .modal-personal-details .movie-rating,
-        #movieDetailsModal .modal-personal-details .movie-status {
-            margin-bottom: 10px;
-        }
-        #movieDetailsModal .modal-personal-details .movie-review {
-            margin-top: 10px;
-        }
-        #movieDetailsModal .modal-personal-details .movie-actions {
-            justify-content: flex-start; /* Align buttons left */
-        }
-        
-        @media (max-width: 768px) {
-            .nav-container {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .nav-links {
-                gap: 15px;
-            }
-
-            .hero-title {
-                font-size: 2em;
-            }
-
-            .controls-section {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .search-bar {
-                max-width: none;
-            }
-
-            .movies-grid {
-                grid-template-columns: 1fr;
-            }
-            #movieDetailsModal .modal-poster {
-                float: none;
-                margin: 0 auto 15px auto;
-            }
-            #movieDetailsModal .modal-info {
-                text-align: center;
-            }
-        }
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
+        .navbar { background: #333; padding: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+        .logo { font-size: 1.8em; font-weight: bold; color: white; text-decoration: none; }
+        .nav-links { display: flex; gap: 30px; align-items: center; }
+        .nav-link { color: white; text-decoration: none; font-weight: 500; padding: 8px 16px; border-radius: 6px; transition: background-color 0.3s ease; }
+        .nav-link:hover { background: rgba(255, 255, 255, 0.1); }
+        .nav-link.active { background: #007bff; }
+        .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; transition: background-color 0.3s ease; }
+        .add-media-btn:hover { background: #0056b3; }
+        .auth-btn { background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; cursor: pointer; border: none; transition: background-color 0.3s ease; }
+        .auth-btn:hover { background: #c82333; }
+        .main-container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+        .hero-section { text-align: center; margin-bottom: 40px; }
+        .hero-title { font-size: 2.5em; color: #333; margin-bottom: 15px; font-weight: normal; }
+        .controls-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px; }
+        .search-bar { position: relative; flex: 1; max-width: 400px; }
+        .search-bar input { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; }
+        .filter-dropdown { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; background-color: white; font-size: 16px; cursor: pointer; }
+        .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
+        .media-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #ddd; transition: transform 0.3s ease, box-shadow 0.3s ease; display: flex; flex-direction: column; }
+        .media-card:hover { transform: translateY(-5px); box-shadow: 0 5px 20px rgba(0,0,0,0.15); }
+        .media-poster { width: 100%; height: 300px; background: #f0f0f0; border-radius: 8px; margin-bottom: 15px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .media-poster img { width: 100%; height: 100%; object-fit: cover; }
+        .no-poster { color: #999; font-size: 14px; }
+        .media-card-content { flex-grow: 1; display: flex; flex-direction: column; }
+        .media-title { font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 8px; cursor: pointer; }
+        .media-year { color: #666; font-size: 0.9em; margin-bottom: 12px; }
+        .media-actions { margin-top: auto; padding-top: 15px; }
+        .btn-details { background: #007bff; color: white; text-decoration: none; padding: 8px 16px; border-radius: 5px; display: inline-block; transition: background-color 0.3s ease; }
+        .btn-details:hover { background: #0056b3; }
+        .empty-state { text-align: center; padding: 80px 20px; color: #666; }
     </style>
 </head>
 <body>
@@ -610,8 +51,8 @@
                 <a href="index.html" class="nav-link active">Library</a>
                 <a href="lists.html" class="nav-link">Lists</a> 
                 <a href="profile.html" class="nav-link">Profile</a>
-                <a id="addMovieNavbarBtn" href="add-movie.html" class="add-movie-btn">+ Add Media</a> 
-                <button id="authBtn" class="logout-btn">Login</button>
+                <a href="add-movie.html" class="add-media-btn">+ Add Media</a> 
+                <button id="authBtn" class="auth-btn">Login</button>
             </div>
         </div>
     </nav>
@@ -623,154 +64,22 @@
 
         <div class="controls-section">
             <div class="search-bar">
-                <input type="text" id="searchInput" placeholder="Search your collection...">
+                <input type="text" id="searchInput" placeholder="Search the library...">
             </div>
-            
             <select id="filterSortDropdown" class="filter-dropdown">
-                <option value="all">All Media</option>
+                 <option value="all">All Media</option>
                 <option value="my">My Media</option>
-                <optgroup label="Filter By">
-                    <option value="watched">Watched</option>
-                    <option value="unwatched">Unwatched</option>
-                    <option value="favorites">5 Stars</option>
-                    <option value="moviesOnly">Movies Only</option> 
-                    <option value="tvShowsOnly">TV Shows Only</option> 
-                </optgroup>
-                <optgroup label="Sort By">
-                    <option value="mostLiked">Rating (Highest)</option>
-                    <option value="leastLiked">Rating (Lowest)</option> 
-                    <option value="titleAsc">Title (A-Z)</option>
-                    <option value="titleDesc">Title (Z-A)</option>
-                    <option value="releaseDateDesc">Release Date (Newest)</option>
-                    <option value="releaseDateAsc">Release Date (Oldest)</option>
-                </optgroup>
             </select>
         </div>
 
-        <div id="moviesContainer">
+        <div id="mediaContainer" class="media-grid">
             <div class="empty-state">
-                <h3>Your collection is empty</h3>
-                <p>Start building your library by adding your first media!</p>
-                <a id="addFirstMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Your First Media</a> 
+                <h3>Loading Library...</h3>
             </div>
         </div>
     </div>
-
-    
-    <div id="confirmationModal" class="modal">
-        <div class="modal-content">
-            <h3 id="confirmationModalTitle">Confirm Action</h3>
-            <p id="confirmationModalMessage">Are you sure?</p>
-            <div class="modal-buttons">
-                <button class="modal-btn confirm" id="confirmModalYes">Yes</button>
-                <button class="modal-btn cancel" id="confirmModalNo">No</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="alertModal" class="modal">
-        <div class="modal-content">
-            <h3 id="alertModalTitle">Alert</h3>
-            <p id="alertModalMessage">Something happened.</p>
-            <div class="modal-buttons">
-                <button class="modal-btn ok" id="alertModalOk">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- NEW: Movie Details Modal -->
-    <div id="movieDetailsModal" class="modal">
-        <div class="modal-content">
-            <button class="close-button" id="closeMovieDetailsModal">&times;</button>
-            <div class="modal-header">
-                <h2 id="modalTitle"></h2>
-            </div>
-            <div style="overflow: hidden;"> <!-- Clearfix for floated poster -->
-                <div id="modalPosterContainer" class="modal-poster"></div>
-                <div class="modal-info">
-                    <p><strong>Year:</strong> <span id="modalYear"></span></p>
-                    <p><strong>Director:</strong> <span id="modalDirector"></span></p>
-                    <p><strong>Genre:</strong> <span id="modalGenre"></span></p>
-                    <p><strong>Runtime:</strong> <span id="modalRuntime"></span></p>
-                    <p><strong>Content Type:</strong> <span id="modalContentType"></span></p>
-                    <p><strong>Added by:</strong> <span id="modalUploader"></span></p>
-                </div>
-            </div>
-            <div class="modal-overview">
-                <h4>Summary</h4>
-                <p id="modalOverview"></p>
-            </div>
-            <div class="modal-cast">
-                <h4>Cast</h4>
-                <p id="modalCast"></p>
-            </div>
-            <div id="modalPersonalDetails" class="modal-personal-details">
-                <h4>My Details</h4>
-                <div class="movie-rating" id="modalMyRating"></div>
-                <div class="movie-status" id="modalMyStatus"></div>
-                <p><strong>My Notes:</strong> <span id="modalMyReview"></span></p>
-                <p><strong>Watched Date:</strong> <span id="modalMyWatchedDate"></span></p>
-                <p><strong>Owned:</strong> <span id="modalMyOwned"></span></p>
-                <div class="movie-actions">
-                    <button class="btn-small btn-edit" id="modalEditBtn">Edit</button>
-                    <button class="btn-small btn-delete" id="modalDeleteBtn">Delete</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
 
     <script>
-        // Global variables
-        let allMovies = []; // This will hold the master list of all movies from the DB
-        let displayedMovies = []; // This will hold the currently filtered/sorted list for display
-        let currentUser = null; 
-        let myInteractions = {}; 
-        let currentFilterSort = 'all'; 
-        let userProfiles = {}; 
-
-        // --- Modal Functions ---
-        function showConfirmationModal(title, message, onConfirm) {
-            const modal = document.getElementById('confirmationModal');
-            document.getElementById('confirmationModalTitle').textContent = title;
-            document.getElementById('confirmationModalMessage').textContent = message;
-            modal.style.display = 'flex'; 
-
-            const yesBtn = document.getElementById('confirmModalYes');
-            const noBtn = document.getElementById('confirmModalNo');
-
-            yesBtn.onclick = null;
-            noBtn.onclick = null;
-
-            yesBtn.onclick = () => {
-                modal.style.display = 'none';
-                onConfirm(true);
-            };
-            noBtn.onclick = () => {
-                modal.style.display = 'none';
-                onConfirm(false);
-            };
-        }
-
-        function showAlertModal(title, message, onOk = () => {}) {
-            const modal = document.getElementById('alertModal');
-            document.getElementById('alertModalTitle').textContent = title;
-            document.getElementById('alertModalMessage').textContent = message;
-            modal.style.display = 'flex'; 
-
-            const okBtn = document.getElementById('alertModalOk');
-
-            okBtn.onclick = null; 
-            okBtn.onclick = () => {
-                modal.style.display = 'none';
-                onOk();
-            };
-        }
-
-        function closeMovieDetailsModal() {
-            document.getElementById('movieDetailsModal').style.display = 'none';
-        }
-
         // --- Firebase Initialization ---
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
@@ -778,326 +87,102 @@
           projectId: "tiny-lizard",
           storageBucket: "tiny-lizard.firebasestorage.app",
           messagingSenderId: "250872474692",
-          appId: "1:250872474692:web:969e0b1302ae3cb4666011",
-          measurementId: "G-43FM6WR90B"
+          appId: "1:250872474692:web:969e0b1302ae3cb4666011"
         };
-
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore(); 
-        const auth = firebase.auth(); 
+        const auth = firebase.auth();
         // --- End Firebase Initialization ---
 
-        // Initialize the app
-        document.addEventListener('DOMContentLoaded', function() {
-            setupEventListeners();
-            
+        let currentUser = null;
+        let allMedia = [];
+        let myInteractions = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(user => {
-                const addMovieNavbarBtn = document.getElementById('addMovieNavbarBtn');
-                const addFirstMovieBtn = document.getElementById('addFirstMovieBtn');
+                currentUser = user;
                 const authBtn = document.getElementById('authBtn');
-                
-                if (user) {
-                    currentUser = user;
-                    console.log('User logged in:', user.email, 'UID:', user.uid);
-                    authBtn.textContent = 'Logout';
-                    addMovieNavbarBtn.href = 'add-movie.html';
-                    if(addFirstMovieBtn) addFirstMovieBtn.href = 'add-movie.html';
-                } else {
-                    currentUser = null;
-                    console.log('User not logged in.');
-                    authBtn.textContent = 'Login';
-                    addMovieNavbarBtn.href = 'auth.html';
-                    if(addFirstMovieBtn) addFirstMovieBtn.href = 'auth.html';
-                }
-                // Always reload data on auth change
-                loadAllData();
+                authBtn.textContent = user ? 'Logout' : 'Login';
+                loadAllMedia();
             });
-        });
 
-        function setupEventListeners() {
-            document.getElementById('searchInput').addEventListener('input', () => renderMovies());
-            document.getElementById('filterSortDropdown').addEventListener('change', (e) => {
-                currentFilterSort = e.target.value;
-                renderMovies();
-            });
             document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
-            document.getElementById('closeMovieDetailsModal').addEventListener('click', closeMovieDetailsModal);
-            document.getElementById('movieDetailsModal').addEventListener('click', (e) => {
-                if (e.target.id === 'movieDetailsModal') {
-                    closeMovieDetailsModal();
-                }
-            });
-        }
-
+            document.getElementById('searchInput').addEventListener('input', renderMedia);
+            document.getElementById('filterSortDropdown').addEventListener('change', renderMedia);
+        });
+        
         async function handleAuthButtonClick() {
             if (currentUser) {
-                try {
-                    await auth.signOut();
-                    showAlertModal('Logged Out', 'You have been successfully logged out.');
-                } catch (error) {
-                    console.error('Logout error:', error);
-                    showAlertModal('Logout Failed', 'An error occurred during logout: ' + error.message);
-                }
+                await auth.signOut();
             } else {
                 window.location.href = 'auth.html';
             }
         }
 
-        async function loadAllData() {
-            console.log("Starting data load...");
+        async function loadAllMedia() {
             try {
-                // Fetch all main movie documents
-                const moviesSnapshot = await db.collection('movies').get();
-                const moviesList = moviesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                // Fetch all user profiles for display names
-                const usersSnapshot = await db.collection('users').get();
-                userProfiles = {};
-                usersSnapshot.forEach(doc => {
-                    userProfiles[doc.id] = doc.data();
-                });
+                const mediaSnapshot = await db.collection('movies').orderBy('dateAdded', 'desc').get();
+                allMedia = mediaSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // Fetch current user's interactions if logged in
-                myInteractions = {};
                 if (currentUser) {
                     const interactionsSnapshot = await db.collection('users').doc(currentUser.uid).collection('movieInteractions').get();
+                    myInteractions = {};
                     interactionsSnapshot.forEach(doc => {
                         myInteractions[doc.id] = doc.data();
                     });
                 }
-
-                // Combine all data into a single master list
-                allMovies = moviesList.map(movie => {
-                    const interaction = myInteractions[movie.id];
-                    const uploaderProfile = userProfiles[movie.originalUploaderId];
-                    const uploaderName = uploaderProfile?.displayName || movie.originalUploaderDisplayName || `User...${movie.originalUploaderId.slice(-4)}`;
-                    
-                    return {
-                        ...movie,
-                        myRating: interaction?.rating || 0,
-                        myWatched: interaction?.watched || false,
-                        myReview: interaction?.review || null,
-                        myOwned: interaction?.owned || false,
-                        myWatchedDate: interaction?.watchedDate || null,
-                        isInMyCollection: !!interaction,
-                        originalUploaderDisplayName: uploaderName
-                    };
-                });
-
-                console.log(`Data loaded. Total media items: ${allMovies.length}. My interactions: ${Object.keys(myInteractions).length}`);
-                renderMovies();
-
+                renderMedia();
             } catch (error) {
-                console.error("Error loading data from Firestore:", error);
-                showAlertModal("Loading Error", "Could not fetch data from the database. Please try again later.");
+                console.error("Error loading media:", error);
+                document.getElementById('mediaContainer').innerHTML = '<div class="empty-state"><h3>Error loading library</h3></div>';
             }
         }
-        
-        function renderMovies() {
-            const container = document.getElementById('moviesContainer');
-            let moviesToDisplay = [...allMovies];
+
+        function renderMedia() {
+            const container = document.getElementById('mediaContainer');
+            const filter = document.getElementById('filterSortDropdown').value;
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-            // 1. Apply View Filter (My Media vs All Media)
-            const viewMode = document.getElementById('filterSortDropdown').value;
-            if (viewMode === 'my') {
+            let mediaToDisplay = allMedia;
+
+            if (filter === 'my') {
                 if (!currentUser) {
-                    container.innerHTML = `<div class="empty-state"><h3>Please log in</h3><p>You need to be logged in to see your personal media.</p></div>`;
+                    container.innerHTML = '<div class="empty-state"><h3>Please log in to see your media.</h3></div>';
                     return;
                 }
-                moviesToDisplay = moviesToDisplay.filter(m => m.isInMyCollection);
+                mediaToDisplay = allMedia.filter(media => myInteractions[media.id]);
             }
 
-            // 2. Apply Search Filter
             if (searchTerm) {
-                moviesToDisplay = moviesToDisplay.filter(movie => 
-                    (movie.title && movie.title.toLowerCase().includes(searchTerm)) ||
-                    (movie.director && movie.director.toLowerCase().includes(searchTerm)) ||
-                    (movie.cast && Array.isArray(movie.cast) && movie.cast.some(c => c.toLowerCase().includes(searchTerm)))
-                );
+                mediaToDisplay = mediaToDisplay.filter(media => (media.title || '').toLowerCase().includes(searchTerm));
             }
 
-            // 3. Apply Content Filters
-            switch(currentFilterSort) {
-                case 'watched':
-                    moviesToDisplay = moviesToDisplay.filter(m => m.myWatched);
-                    break;
-                case 'unwatched':
-                    moviesToDisplay = moviesToDisplay.filter(m => m.isInMyCollection && !m.myWatched);
-                    break;
-                case 'favorites':
-                    moviesToDisplay = moviesToDisplay.filter(m => m.myRating === 5);
-                    break;
-                case 'moviesOnly':
-                    moviesToDisplay = moviesToDisplay.filter(m => m.contentType === 'movie');
-                    break;
-                case 'tvShowsOnly':
-                    moviesToDisplay = moviesToDisplay.filter(m => m.contentType === 'tv');
-                    break;
+            if (mediaToDisplay.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3>No media found.</h3><p>Try adjusting your filters or add some media!</p></div>';
+                return;
             }
 
-            // 4. Apply Sorting
-            switch(currentFilterSort) {
-                case 'mostLiked':
-                    moviesToDisplay.sort((a, b) => b.myRating - a.myRating);
-                    break;
-                case 'leastLiked':
-                    moviesToDisplay.sort((a, b) => a.myRating - b.myRating);
-                    break;
-                case 'titleAsc':
-                    moviesToDisplay.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                    break;
-                case 'titleDesc':
-                    moviesToDisplay.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
-                    break;
-                case 'releaseDateDesc':
-                    moviesToDisplay.sort((a, b) => (b.year || 0) - (a.year || 0));
-                    break;
-                case 'releaseDateAsc':
-                    moviesToDisplay.sort((a, b) => (a.year || 0) - (b.year || 0));
-                    break;
-            }
-
-            // 5. Generate and display HTML
-            if (moviesToDisplay.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <h3>No Media Found</h3>
-                        <p>Try adjusting your search or filters, or add some new media to your library!</p>
-                        <a id="addFirstMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Media</a>
+            container.innerHTML = mediaToDisplay.map(media => {
+                const title = media.title || 'Untitled';
+                return `
+                    <div class="media-card">
+                        <div class="media-poster" onclick="viewMediaDetails('${media.id}')">
+                            ${media.posterUrl ? `<img src="${media.posterUrl}" alt="${title} poster" loading="lazy">` : '<div class="no-poster">No Poster</div>'}
+                        </div>
+                        <div class="media-card-content">
+                            <h3 class="media-title" onclick="viewMediaDetails('${media.id}')">${title}</h3>
+                            <p class="media-year">${media.year || ''}</p>
+                            <div class="media-actions">
+                                <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
+                            </div>
+                        </div>
                     </div>
                 `;
-                if (!currentUser) {
-                    document.getElementById('addFirstMovieBtn').href = 'auth.html';
-                }
-                return;
-            }
-
-            const moviesHTML = moviesToDisplay.map(movie => {
-                const title = movie.title || movie.name || 'Untitled';
-                return ` 
-                <div class="movie-card">
-                    <div class="movie-poster" onclick="openMovieDetailsModal('${movie.id}')">
-                        ${movie.posterUrl ? 
-                            `<img src="${movie.posterUrl}" alt="${title} poster" loading="lazy">` : 
-                            `<div class="no-poster">No Poster</div>`
-                        }
-                    </div>
-                    <div class="movie-card-content">
-                        <div class="movie-title" onclick="openMovieDetailsModal('${movie.id}')">
-                            ${title} 
-                            ${movie.myOwned ? '<span class="owned-badge">Owned</span>' : ''} 
-                        </div>
-                        ${movie.year ? `<div class="movie-year">${movie.year}</div>` : ''}
-                        
-                        ${movie.isInMyCollection ? ` 
-                            ${movie.myRating > 0 ? `<div class="movie-rating">${generateStarDisplay(movie.myRating)}</div>` : ''}
-                            <div class="movie-status ${movie.myWatched ? 'watched' : 'unwatched'}"> 
-                                ${movie.myWatched ? '✓ Watched' : '○ Not Watched'} 
-                            </div>
-                        ` : ''}
-                        
-                        <div class="movie-details">
-                            ${movie.director ? `<div><strong>Director:</strong> ${movie.director}</div>` : ''}
-                            ${movie.overview ? `<p class="movie-overview">${movie.overview}</p>` : ''}
-                        </div>
-                        
-                        <div class="movie-actions">
-                            ${currentUser ? (
-                                movie.isInMyCollection ? ` 
-                                    <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
-                                    <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
-                                ` : `
-                                    <button class="btn-add-to-my-collection" onclick="addExistingMovieToMyCollection('${movie.id}')">Add to My Media</button> 
-                                `
-                            ) : `
-                                <button class="btn-add-to-my-collection" onclick="window.location.href='auth.html'">Add to My Media</button>
-                            `}
-                        </div>
-                    </div>
-                </div>
-            `}).join('');
-
-            container.innerHTML = `<div class="movies-grid">${moviesHTML}</div>`;
+            }).join('');
         }
 
-        function generateStarDisplay(rating) {
-            let stars = '';
-            for (let i = 1; i <= 5; i++) {
-                stars += `<span class="star ${i <= rating ? '' : 'empty'}">★</span>`;
-            }
-            return stars;
-        }
-
-        function editMovie(movieId) {
-            window.location.href = `add-movie.html?edit=${movieId}`;
-        }
-
-        async function deleteMovie(movieId) { 
-            showConfirmationModal('Delete From Your Media', 'Are you sure you want to remove this from your personal collection?', async (confirmed) => { 
-                if (confirmed && currentUser) {
-                    try {
-                        // We only ever delete the *interaction*, not the main movie document from the index page.
-                        await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
-                        showAlertModal('Success', 'The item has been removed from your media.');
-                        loadAllData(); // Reload all data to reflect the change
-                    } catch (error) {
-                        console.error('Error deleting interaction from Firestore:', error);
-                        showAlertModal('Error', 'Failed to remove item: ' + error.message);
-                    }
-                }
-            });
-        }
-
-        function addExistingMovieToMyCollection(movieId) {
-            window.location.href = `add-movie.html?edit=${movieId}`;
-        }
-
-        async function openMovieDetailsModal(movieId) {
-            const modal = document.getElementById('movieDetailsModal');
-            modal.style.display = 'flex'; 
-
-            const movieData = allMovies.find(m => m.id === movieId);
-            if (!movieData) {
-                showAlertModal('Error', 'Could not find details for this item.');
-                closeMovieDetailsModal();
-                return;
-            }
-
-            const title = movieData.title || movieData.name || 'Unknown Title';
-            document.getElementById('modalTitle').textContent = title;
-            
-            if (movieData.posterUrl) {
-                document.getElementById('modalPosterContainer').innerHTML = `<img src="${movieData.posterUrl}" alt="${title} poster">`; 
-            } else {
-                document.getElementById('modalPosterContainer').innerHTML = `<div class="no-poster">No Poster</div>`;
-            }
-
-            document.getElementById('modalYear').textContent = movieData.year || 'N/A'; 
-            document.getElementById('modalDirector').textContent = movieData.director || 'N/A';
-            document.getElementById('modalGenre').textContent = movieData.genre || 'N/A';
-            document.getElementById('modalRuntime').textContent = movieData.runtime ? `${movieData.runtime} min` : 'N/A'; 
-            document.getElementById('modalContentType').textContent = movieData.contentType === 'tv' ? 'TV Show' : 'Movie'; 
-            document.getElementById('modalUploader').textContent = movieData.originalUploaderDisplayName || 'N/A';
-            document.getElementById('modalOverview').textContent = movieData.overview || 'No summary available.';
-            document.getElementById('modalCast').textContent = (movieData.cast && movieData.cast.length > 0) ? movieData.cast.join(', ') : 'N/A';
-
-            if (movieData.isInMyCollection) {
-                document.getElementById('modalPersonalDetails').style.display = 'block';
-                document.getElementById('modalMyRating').innerHTML = movieData.myRating > 0 ? generateStarDisplay(movieData.myRating) : 'Not Rated';
-                document.getElementById('modalMyStatus').innerHTML = `<div class="movie-status ${movieData.myWatched ? 'watched' : 'unwatched'}">${movieData.myWatched ? '✓ Watched' : '○ Not Watched'}</div>`;
-                document.getElementById('modalMyReview').textContent = movieData.myReview || 'No personal notes.';
-                document.getElementById('modalMyWatchedDate').textContent = movieData.myWatchedDate || 'N/A';
-                document.getElementById('modalMyOwned').textContent = movieData.myOwned ? 'Yes' : 'No';
-
-                const modalEditBtn = document.getElementById('modalEditBtn');
-                const modalDeleteBtn = document.getElementById('modalDeleteBtn');
-
-                modalEditBtn.onclick = () => { editMovie(movieId); };
-                modalDeleteBtn.onclick = () => { deleteMovie(movieId); };
-            } else {
-                document.getElementById('modalPersonalDetails').style.display = 'none'; 
-            }
+        function viewMediaDetails(mediaId) {
+            window.location.href = `library.html?id=${mediaId}`;
         }
     </script>
 </body>
