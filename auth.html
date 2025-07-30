@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login / Sign Up - tiny lizard</title>
+    <title>Login / Sign Up - the library sale</title> <!-- UPDATED TITLE -->
+    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script> <!-- NEW: Firestore SDK for user profiles -->
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -119,6 +121,10 @@
     <div class="auth-container">
         <h1 id="authTitle">Login</h1>
         <form id="authForm">
+            <div class="form-group" id="displayNameGroup" style="display: none;"> <!-- NEW: Display name group -->
+                <label for="displayName">Username</label>
+                <input type="text" id="displayName" placeholder="Choose a username">
+            </div>
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" required placeholder="your.email@example.com">
@@ -149,9 +155,10 @@
 
         // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth(); // Get Firebase Auth instance
+        const auth = firebase.auth(); 
+        const db = firebase.firestore(); // NEW: Firestore instance
 
-        let isLoginMode = true; // State to track if we're in login or signup mode
+        let isLoginMode = true; 
 
         document.addEventListener('DOMContentLoaded', function() {
             const authTitle = document.getElementById('authTitle');
@@ -159,12 +166,14 @@
             const toggleAuthModeLink = document.getElementById('toggleAuthMode');
             const authForm = document.getElementById('authForm');
             const authMessageDiv = document.getElementById('authMessage');
+            const displayNameGroup = document.getElementById('displayNameGroup'); // NEW
+            const displayNameInput = document.getElementById('displayName'); // NEW
 
             // Listen for auth state changes to redirect if already logged in
             auth.onAuthStateChanged(user => {
                 if (user) {
                     console.log('User is logged in:', user.email);
-                    window.location.href = 'index.html'; // Redirect to main app
+                    window.location.href = 'index.html'; 
                 }
             });
 
@@ -175,10 +184,14 @@
                     authTitle.textContent = 'Login';
                     authSubmitBtn.textContent = 'Login';
                     toggleAuthModeLink.textContent = 'Sign Up';
+                    displayNameGroup.style.display = 'none'; // Hide display name for login
+                    displayNameInput.removeAttribute('required'); // Make display name not required for login
                 } else {
                     authTitle.textContent = 'Sign Up';
                     authSubmitBtn.textContent = 'Sign Up';
                     toggleAuthModeLink.textContent = 'Login';
+                    displayNameGroup.style.display = 'block'; // Show display name for signup
+                    displayNameInput.setAttribute('required', 'true'); // Make display name required for signup
                 }
                 authMessageDiv.style.display = 'none'; // Clear messages on mode switch
             });
@@ -190,16 +203,27 @@
 
                 const email = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
+                const displayName = document.getElementById('displayName').value; // NEW
 
                 try {
                     if (isLoginMode) {
                         await auth.signInWithEmailAndPassword(email, password);
                         displayAuthMessage('Logged in successfully! Redirecting...', 'success');
-                        // Redirection handled by onAuthStateChanged listener
                     } else {
-                        await auth.createUserWithEmailAndPassword(email, password);
+                        // Sign up the user
+                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                        const user = userCredential.user;
+
+                        // Create a user profile document in Firestore
+                        if (user) {
+                            await db.collection('users').doc(user.uid).set({
+                                displayName: displayName,
+                                email: user.email,
+                                dateCreated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            console.log('User profile created in Firestore for UID:', user.uid);
+                        }
                         displayAuthMessage('Account created successfully! Redirecting...', 'success');
-                        // Redirection handled by onAuthStateChanged listener
                     }
                 } catch (error) {
                     console.error('Authentication Error:', error);
@@ -231,7 +255,7 @@
 
             function displayAuthMessage(message, type) {
                 authMessageDiv.textContent = message;
-                authMessageDiv.className = ''; // Clear existing classes
+                authMessageDiv.className = ''; 
                 authMessageDiv.classList.add(type);
                 authMessageDiv.style.display = 'block';
             }

@@ -499,15 +499,16 @@
         let currentUser = null; 
         
         // TMDb API configuration
-        // TMDB_API_KEY is now handled by the Vercel proxy, so it's not needed here directly.
         const TMDB_BASE_URL = '/api/tmdb'; // Points to your Vercel proxy endpoint
         const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
         // Global variables to store additional TMDb data
         let selectedMovieOverview = null; 
         let selectedMovieCast = []; 
+        // NEW: Global variable for content type (movie or tv)
+        let selectedContentType = null; 
 
-        // NEW: Flag to control public fields editability
+        // Flag to control public fields editability
         let isPublicFieldsEditable = true; // True by default for manual entry
 
         // ZXing-JS specific variables
@@ -558,7 +559,7 @@
             }
         }
         
-        // NEW: Helper to toggle readonly state and visual style of public fields
+        // Helper to toggle readonly state and visual style of public fields
         function togglePublicFieldsReadonly(isReadonly) {
             const fields = [
                 document.getElementById('title'),
@@ -566,14 +567,13 @@
                 document.getElementById('genre'),
                 document.getElementById('year'),
                 document.getElementById('runtime'),
-                document.getElementById('summary'), // Renamed from overview
-                document.getElementById('cast')      // Renamed from cast
+                document.getElementById('summary'), 
+                document.getElementById('cast')      
             ];
 
             fields.forEach(field => {
-                if (field) { // Ensure element exists
+                if (field) { 
                     field.readOnly = isReadonly;
-                    // Add/remove a class for visual styling (e.g., lighter background)
                     field.classList.toggle('readonly-field', isReadonly); 
                 }
             });
@@ -609,9 +609,9 @@
                     setupLogout(); 
 
                     // For a fresh form, ensure public fields are editable initially
-                    if (!editingMovieId) { // Only if not in edit mode (i.e., new entry)
-                        togglePublicFieldsReadonly(false); // Make them editable
-                        isPublicFieldsEditable = true; // Set flag
+                    if (!editingMovieId) { 
+                        togglePublicFieldsReadonly(false); 
+                        isPublicFieldsEditable = true; 
                     }
                     
                 } else {
@@ -898,18 +898,9 @@
                 }
                 
                 // Step 4: Auto-select the first movie result
+                // Default to movie content type for barcode lookup, as UPCs are usually for physical movies
                 const movie = tmdbData.results[0];
-                
-                barcodeResultDiv.innerHTML = `
-                    <div class="status-message status-info">
-                        <p>✅ Found product: <strong>${productName}</strong></p>
-                        <p>🎬 Found movie: <strong>${movie.title}</strong> (${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown'})</p>
-                        <p>📝 Auto-filling form...</p>
-                    </div>
-                `;
-                showStatusMessage(`Found movie: ${movie.title}. Auto-filling form...`, 'info');
-                
-                await selectMovie(movie.id); 
+                await selectMovie(movie.id, 'movie'); // Pass 'movie' as content type
                 
                 setTimeout(() => {
                     barcodeResultDiv.innerHTML = `
@@ -1043,18 +1034,19 @@
                     tmdbId: document.getElementById('movieForm').dataset.tmdbId ? parseInt(document.getElementById('movieForm').dataset.tmdbId) : null,
                     dateAdded: firebase.firestore.FieldValue.serverTimestamp(), 
                     originalUploaderId: currentUser.uid, 
-                    overview: document.getElementById('summary').value.trim() || null, // Get from 'summary'
+                    overview: document.getElementById('summary').value.trim() || null, 
                     cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null,
-                    isManualEntry: isPublicFieldsEditable // NEW: Store whether it was a manual entry
+                    isManualEntry: isPublicFieldsEditable, 
+                    contentType: selectedContentType || 'movie' // NEW: Save content type (default to 'movie' if not set)
                 };
 
                 // Data for the user's personal 'movieInteractions' subcollection
                 const userInteractionData = {
                     rating: currentRating || 0, 
-                    watched: document.getElementById('watchedCheckbox').checked, // Checkbox value
+                    watched: document.getElementById('watchedCheckbox').checked, 
                     review: document.getElementById('review').value.trim() || null,
-                    watchedDate: document.getElementById('watchedDate').value || null, // NEW: Watched Date
-                    owned: document.getElementById('ownedCheckbox').checked, // NEW: Owned checkbox
+                    watchedDate: document.getElementById('watchedDate').value || null, 
+                    owned: document.getElementById('ownedCheckbox').checked, 
                     interactionDate: firebase.firestore.FieldValue.serverTimestamp() 
                 };
 
@@ -1066,15 +1058,11 @@
                         movieDocRef = existingMovieQuery.docs[0].ref;
                         console.log("Movie with TMDb ID already exists. Using existing document:", movieDocRef.id);
                         // Only update main movie data if current user is original uploader AND it was a manual entry
-                        // Or if the existing entry itself was a manual entry and this user is the original uploader
                         const existingMovieInDb = existingMovieQuery.docs[0].data();
                         if (existingMovieInDb.originalUploaderId === currentUser.uid && existingMovieInDb.isManualEntry) {
-                            await movieDocRef.update(mainMovieData); // Update existing main movie data
+                            await movieDocRef.update(mainMovieData); 
                             console.log("Original uploader updated main movie data (manual entry).");
                         } else if (existingMovieInDb.originalUploaderId === currentUser.uid && !existingMovieInDb.isManualEntry && isPublicFieldsEditable) {
-                            // This case means original was TMDB-sourced, but user is trying to make it manual.
-                            // We should prevent this or overwrite if desired. For now, we'll just update user's interaction.
-                            // Or, if the original uploader is editing a TMDB-sourced movie, they can't change public facts.
                             console.log("Original uploader attempting to edit TMDB-sourced movie. Main movie data will not be updated.");
                         } else {
                             console.log("Not original uploader or not a manual entry, skipping main movie update.");
@@ -1091,7 +1079,7 @@
                 // Step 2: Add/update the user's interaction data in their specific subcollection
                 await db.collection('users').doc(currentUser.uid)
                         .collection('movieInteractions').doc(movieDocRef.id) 
-                        .set(userInteractionData, { merge: true }); // Use .set() with merge to create or overwrite
+                        .set(userInteractionData, { merge: true }); 
 
                 console.log('Movie and user interaction added successfully!');
                 showStatusMessage('Movie added successfully!', 'success');
@@ -1140,17 +1128,18 @@
                     posterUrl: document.getElementById('movieForm').dataset.posterUrl || null,
                     runtime: document.getElementById('runtime').value ? parseInt(document.getElementById('runtime').value) : null,
                     overview: document.getElementById('summary').value.trim() || null, 
-                    cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null 
+                    cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null,
+                    contentType: selectedContentType || 'movie' // NEW: Update content type
                 };
 
                 // Data for updating the user's personal 'movieInteractions' subcollection
                 const userInteractionUpdates = {
                     rating: currentRating || 0,
-                    watched: document.getElementById('watchedCheckbox').checked, // Checkbox value
+                    watched: document.getElementById('watchedCheckbox').checked, 
                     review: document.getElementById('review').value.trim() || null,
-                    watchedDate: document.getElementById('watchedDate').value || null, // NEW: Watched Date
-                    owned: document.getElementById('ownedCheckbox').checked, // NEW: Owned checkbox
-                    interactionDate: firebase.firestore.FieldValue.serverTimestamp() // Update interaction date on any change
+                    watchedDate: document.getElementById('watchedDate').value || null, 
+                    owned: document.getElementById('ownedCheckbox').checked, 
+                    interactionDate: firebase.firestore.FieldValue.serverTimestamp() 
                 };
 
                 // Fetch the existing movie to check originalUploaderId and isManualEntry
@@ -1201,14 +1190,15 @@
             document.getElementById('statusMessage').innerHTML = '';
             selectedMovieOverview = null; 
             selectedMovieCast = []; 
+            selectedContentType = null; // NEW: Clear content type
             document.getElementById('summary').value = ''; 
             document.getElementById('cast').value = ''; 
-            document.getElementById('watchedCheckbox').checked = false; // Clear checkbox
-            document.getElementById('watchedDate').value = ''; // Clear date
-            document.getElementById('ownedCheckbox').checked = false; // Clear checkbox
+            document.getElementById('watchedCheckbox').checked = false; 
+            document.getElementById('watchedDate').value = ''; 
+            document.getElementById('ownedCheckbox').checked = false; 
 
-            togglePublicFieldsReadonly(false); // Make fields editable for a new entry
-            isPublicFieldsEditable = true; // Reset flag for new entry
+            togglePublicFieldsReadonly(false); 
+            isPublicFieldsEditable = true; 
         }
 
         async function checkEditMode() { 
@@ -1244,12 +1234,12 @@
 
                 // Determine if public fields should be editable based on originalUploaderId and isManualEntry
                 if (currentUser.uid === mainMovieData.originalUploaderId && mainMovieData.isManualEntry === true) {
-                    isPublicFieldsEditable = true; // Original uploader and manual entry -> editable
-                    togglePublicFieldsReadonly(false); // Make them editable
+                    isPublicFieldsEditable = true; 
+                    togglePublicFieldsReadonly(false); 
                     console.log('Editing own manual entry. Public fields are editable.');
                 } else {
-                    isPublicFieldsEditable = false; // Not original uploader OR TMDB-sourced -> read-only
-                    togglePublicFieldsReadonly(true); // Make them read-only
+                    isPublicFieldsEditable = false; 
+                    togglePublicFieldsReadonly(true); 
                     console.log('Not own manual entry. Public fields are read-only.');
                 }
 
@@ -1264,8 +1254,6 @@
                     console.log('User-specific interaction data loaded:', userInteractionData);
                 } else {
                     console.log('No existing user-specific interaction data for this movie. Will use defaults/empty.');
-                    // If no interaction data, and we're in edit mode, it means user clicked "Add to My Movies"
-                    // So we should initialize defaults for the form.
                     userInteractionData = {
                         rating: 0,
                         watched: false,
@@ -1278,6 +1266,7 @@
                 // Store loaded overview and cast into global variables for updateMovie to use
                 selectedMovieOverview = mainMovieData.overview || null;
                 selectedMovieCast = mainMovieData.cast || [];
+                selectedContentType = mainMovieData.contentType || 'movie'; // NEW: Load content type
 
                 // Populate the form with main movie data
                 document.getElementById('title').value = mainMovieData.title || '';
@@ -1309,8 +1298,8 @@
                 document.getElementById('watchedDate').value = userInteractionData.watchedDate || ''; 
                 document.getElementById('ownedCheckbox').checked = userInteractionData.owned; 
                 
-                document.getElementById('formTitle').textContent = 'Edit Movie';
-                document.getElementById('submitBtn').textContent = 'Update Movie';
+                document.getElementById('formTitle').textContent = 'Edit Movie'; // Consider "Edit Content" here
+                document.getElementById('submitBtn').textContent = 'Update Movie'; // Consider "Update Content" here
                 showStatusMessage('Movie loaded for editing', 'success');
 
             } catch (error) {
@@ -1329,82 +1318,107 @@
             const searchBtn = document.getElementById('searchBtn');
             const searchInput = document.getElementById('movieSearch');
             
-            // NEW: Autocomplete functionality
+            // Autocomplete functionality
             let searchTimeout;
             searchInput.addEventListener('input', () => {
                 clearTimeout(searchTimeout);
                 const query = searchInput.value.trim();
-                if (query.length > 2) { // Start searching after 2 characters
-                    searchTimeout = setTimeout(() => performSearch(query, true), 300); // Debounce for 300ms, pass true for autocomplete
+                if (query.length > 2) { 
+                    searchTimeout = setTimeout(() => performSearch(query, true), 300); 
                 } else {
-                    document.getElementById('searchResults').innerHTML = ''; // Clear results if query is too short
+                    document.getElementById('searchResults').innerHTML = ''; 
                 }
             });
 
             // Original search button behavior (for explicit click/Enter)
-            searchBtn.addEventListener('click', () => performSearch(searchInput.value.trim(), false)); // Pass false for explicit search
+            searchBtn.addEventListener('click', () => performSearch(searchInput.value.trim(), false)); 
             searchInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
-                    clearTimeout(searchTimeout); // Clear debounce if Enter is pressed
-                    performSearch(searchInput.value.trim(), false); // Perform explicit search
+                    clearTimeout(searchTimeout); 
+                    performSearch(searchInput.value.trim(), false); 
                 }
             });
         }
 
-        async function performSearch(query, isAutocomplete = false) { // Added isAutocomplete flag
+        async function performSearch(query, isAutocomplete = false) { 
             const resultsDiv = document.getElementById('searchResults');
             const searchBtn = document.getElementById('searchBtn');
             
             if (!query) {
-                resultsDiv.innerHTML = ''; // Clear results if query is empty
-                if (!isAutocomplete) { // Only show error for explicit search
+                resultsDiv.innerHTML = ''; 
+                if (!isAutocomplete) { 
                     showStatusMessage('Please enter a search query.', 'error');
                 }
                 return;
             }
             
             try {
-                if (!isAutocomplete) { // Only disable/show loading for explicit search
+                if (!isAutocomplete) { 
                     searchBtn.disabled = true;
                     searchBtn.textContent = 'Searching...';
-                    showStatusMessage('Searching for movies...', 'info');
+                    showStatusMessage('Searching for content...', 'info'); 
                 }
                 resultsDiv.innerHTML = '<p>Searching...</p>';
                 
                 console.log('Searching for:', query);
                 
-                // Use the Vercel proxy for TMDb calls
-                const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`;
-                console.log('TMDb search URL:', searchUrl);
-                
-                const response = await fetch(searchUrl);
-                
-                console.log('TMDb response status:', response.status, response.statusText);
-                
-                if (!response.ok) {
-                    throw new Error(`TMDb API error: ${response.status} ${response.statusText}`);
+                // --- Parallel TMDb API Calls for Movies and TV Shows ---
+                const movieSearchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`;
+                const tvSearchUrl = `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(query)}`; 
+
+                console.log('TMDb movie search URL:', movieSearchUrl);
+                console.log('TMDb TV search URL:', tvSearchUrl);
+
+                const [movieResponse, tvResponse] = await Promise.all([
+                    fetch(movieSearchUrl),
+                    fetch(tvSearchUrl)
+                ]);
+
+                if (!movieResponse.ok) {
+                    const errorText = await movieResponse.text();
+                    console.error(`TMDb Movie API error: ${movieResponse.status} ${movieResponse.statusText}`, errorText);
+                    throw new Error(`Movie search failed: ${movieResponse.status} ${movieResponse.statusText}`);
                 }
+                const movieData = await movieResponse.json();
+
+                if (!tvResponse.ok) {
+                    const errorText = await tvResponse.text();
+                    console.error(`TMDb TV API error: ${tvResponse.status} ${tvResponse.statusText}`, errorText);
+                    throw new Error(`TV search failed: ${tvResponse.status} ${tvResponse.statusText}`);
+                }
+                const tvData = await tvResponse.json();
+
+                // Combine results and add a 'contentType' field
+                let combinedResults = [];
+                if (movieData.results) {
+                    combinedResults = combinedResults.concat(movieData.results.map(item => ({ ...item, contentType: 'movie' })));
+                }
+                if (tvData.results) {
+                    combinedResults = combinedResults.concat(tvData.results.map(item => ({ ...item, contentType: 'tv' })));
+                }
+
+                // Sort combined results by popularity (descending)
+                combinedResults.sort((a, b) => b.popularity - a.popularity);
+
+                console.log("TMDb combined search results:", combinedResults); 
                 
-                const data = await response.json(); 
-                console.log("TMDb search results:", data); 
-                
-                if (data && data.results) { 
-                    displayResults(data.results);
-                    if (!isAutocomplete) { // Only show success for explicit search
-                        showStatusMessage(`Found ${data.results.length} movies`, 'success');
+                if (combinedResults.length > 0) { 
+                    displayResults(combinedResults); 
+                    if (!isAutocomplete) { 
+                        showStatusMessage(`Found ${combinedResults.length} results`, 'success'); 
                     }
                 } else {
-                    console.error('Unexpected response format or no results array:', data);
-                    throw new Error('Unexpected response format from TMDb API or no "results" array.');
+                    console.error('No results or unexpected response format:', combinedResults);
+                    throw new Error('No results found from TMDb or unexpected response format.');
                 }
                 
             } catch (error) {
                 console.error('Search error:', error);
-                if (!isAutocomplete) { // Only show error for explicit search
-                    showStatusMessage('Error searching movies: ' + error.message, 'error');
+                if (!isAutocomplete) { 
+                    showStatusMessage('Error searching content: ' + error.message, 'error'); 
                     resultsDiv.innerHTML = `
                         <div class="status-message status-error">
-                            <p>❌ Error searching movies: ${error.message}</p>
+                            <p>❌ Error searching content: ${error.message}</p>
                             <p>This might be due to:</p>
                             <ul style="text-align: left; margin: 10px 0;">
                                 <li>Network connectivity issues</li>
@@ -1416,10 +1430,10 @@
                         </div>
                     `;
                 } else {
-                    resultsDiv.innerHTML = `<p>Error fetching suggestions.</p>`; // Simpler message for autocomplete
+                    resultsDiv.innerHTML = `<p>Error fetching suggestions.</p>`; 
                 }
             } finally {
-                if (!isAutocomplete) { // Only re-enable for explicit search
+                if (!isAutocomplete) { 
                     searchBtn.disabled = false;
                     searchBtn.textContent = 'Search';
                 }
@@ -1432,25 +1446,31 @@
             console.log('Displaying results:', results);
             
             if (!results || results.length === 0) { 
-                resultsDiv.innerHTML = '<p>No movies found for your search.</p>';
+                resultsDiv.innerHTML = '<p>No content found for your search.</p>'; // Updated message
                 return;
             }
             
             try {
-                const html = results.slice(0, 10).map((movie, index) => {
-                    console.log(`Processing movie ${index}:`, movie);
+                const html = results.slice(0, 10).map((item, index) => { // Renamed 'movie' to 'item' for generality
+                    console.log(`Processing item ${index}:`, item);
                     
+                    // Use item.title for movies, item.name for TV shows
+                    const title = item.title || item.name || 'Unknown Title';
+                    // Use release_date for movies, first_air_date for TV shows
+                    const year = item.release_date ? new Date(item.release_date).getFullYear() : (item.first_air_date ? new Date(item.first_air_date).getFullYear() : 'Unknown Year');
+                    const overview = item.overview || 'No description available';
+
                     return `
-                        <div class="search-result" onclick="selectMovie(${movie.id})" style="cursor: pointer;">
-                            ${movie.poster_path ? 
-                                `<img src="${TMDB_IMAGE_BASE}${movie.poster_path}" alt="${movie.title} poster" class="search-result-poster">` :
+                        <div class="search-result" onclick="selectMovie(${item.id}, '${item.contentType}')" style="cursor: pointer;">
+                            ${item.poster_path ? 
+                                `<img src="${TMDB_IMAGE_BASE}${item.poster_path}" alt="${title} poster" class="search-result-poster">` :
                                 `<div class="no-poster">No Poster</div>`
                             }
                             <div class="search-result-info">
-                                <h4>${movie.title || 'Unknown Title'}</h4>
-                                <p><strong>Year:</strong> ${movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown Year'}</p>
-                                <p><strong>Overview:</strong> ${movie.overview ? movie.overview.substring(0, 150) + '...' : 'No description available'}</p>
-                                ${movie.vote_average ? `<p><strong>Rating:</strong> ${movie.vote_average}/10</p>` : ''}
+                                <h4>${title} ${item.contentType === 'tv' ? '<span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">TV Show</span>' : ''}</h4>
+                                <p><strong>Year:</strong> ${year}</p>
+                                <p><strong>Overview:</strong> ${overview.substring(0, 150)}${overview.length > 150 ? '...' : ''}</p>
+                                ${item.vote_average ? `<p><strong>Rating:</strong> ${item.vote_average}/10</p>` : ''}
                             </div>
                         </div>
                     `;
@@ -1465,13 +1485,14 @@
             }
         }
 
-        async function selectMovie(tmdbMovieId) { 
+        async function selectMovie(tmdbContentId, contentType) { // Added contentType parameter
             try {
-                showStatusMessage('Loading movie details...', 'info');
-                console.log('Selecting movie ID:', tmdbMovieId);
+                showStatusMessage('Loading content details...', 'info');
+                console.log('Selecting content ID:', tmdbContentId, 'Type:', contentType);
                 
-                // Use the Vercel proxy for TMDb calls
-                const detailsUrl = `${TMDB_BASE_URL}/movie/${tmdbMovieId}?append_to_response=credits`;
+                // Determine the correct TMDb endpoint based on contentType
+                const endpoint = contentType === 'movie' ? 'movie' : 'tv';
+                const detailsUrl = `${TMDB_BASE_URL}/${endpoint}/${tmdbContentId}?append_to_response=credits`;
                 console.log('TMDb details URL:', detailsUrl);
                 
                 const response = await fetch(detailsUrl);
@@ -1479,80 +1500,84 @@
                 console.log('TMDb details response status:', response.status, response.statusText);
                 
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch movie details: ${response.status} ${response.statusText}`);
+                    throw new Error(`Failed to fetch content details: ${response.status} ${response.statusText}`);
                 }
                 
-                const movie = await response.json();
-                console.log('Movie details received:', movie);
+                const content = await response.json(); 
+                console.log('Content details received:', content);
                 
+                // Store global content type
+                selectedContentType = contentType; 
+
                 // Extract overview
-                selectedMovieOverview = movie.overview || null; 
+                selectedMovieOverview = content.overview || null; 
                 console.log('Extracted overview:', selectedMovieOverview);
 
-                // Extract top billed cast (e.g., first 3 actors)
-                selectedMovieCast = movie.credits?.cast?.slice(0, 3).map(person => person.name) || [];
+                // Extract top billed cast 
+                selectedMovieCast = content.credits?.cast?.slice(0, 3).map(person => person.name) || [];
                 console.log('Extracted cast:', selectedMovieCast);
 
-                const director = movie.credits?.crew?.find(person => person.job === 'Director')?.name || '';
-                const genres = movie.genres?.map(genre => genre.name).join(', ') || '';
+                const director = content.credits?.crew?.find(person => person.job === 'Director')?.name || '';
+                const genres = content.genres?.map(genre => genre.name).join(', ') || '';
                 
                 console.log('Extracted director:', director);
                 console.log('Extracted genres:', genres);
                 
-                document.getElementById('title').value = movie.title || '';
-                document.getElementById('year').value = movie.release_date ? new Date(movie.release_date).getFullYear() : '';
+                // Populate form fields (use content.title for movies, content.name for TV)
+                document.getElementById('title').value = content.title || content.name || ''; 
+                document.getElementById('year').value = content.release_date ? new Date(content.release_date).getFullYear() : (content.first_air_date ? new Date(content.first_air_date).getFullYear() : ''); 
                 document.getElementById('director').value = director;
                 document.getElementById('genre').value = genres;
-                document.getElementById('runtime').value = movie.runtime || '';
+                document.getElementById('runtime').value = content.runtime || content.episode_run_time?.[0] || ''; 
                 
                 document.getElementById('summary').value = selectedMovieOverview || ''; 
                 document.getElementById('cast').value = (selectedMovieCast && Array.isArray(selectedMovieCast)) ? selectedMovieCast.join(', ') : '';
 
-                // Set poster URL and NEW TMDb ID on the form's dataset
-                if (movie.poster_path) {
-                    const posterUrl = `${TMDB_IMAGE_BASE}${movie.poster_path}`;
+                // Set poster URL and TMDb ID on the form's dataset
+                if (content.poster_path) {
+                    const posterUrl = `${TMDB_IMAGE_BASE}${content.poster_path}`;
                     document.getElementById('movieForm').dataset.posterUrl = posterUrl;
                     console.log('Poster URL set:', posterUrl);
                 } else {
                     document.getElementById('movieForm').removeAttribute('data-poster-url'); 
                     console.log('No poster available');
                 }
-                document.getElementById('movieForm').dataset.tmdbId = tmdbMovieId; 
-                console.log('TMDb ID set:', tmdbMovieId);
+                document.getElementById('movieForm').dataset.tmdbId = tmdbContentId; 
+                console.log('TMDb ID set:', tmdbContentId);
 
                 // After populating from TMDb, make public fields read-only
-                isPublicFieldsEditable = false; // Mark as not manually editable
-                togglePublicFieldsReadonly(true); // Make fields read-only
+                isPublicFieldsEditable = false; 
+                togglePublicFieldsReadonly(true); 
 
-                // Check if this movie (by TMDb ID) already exists in Firestore's 'movies' collection
-                const existingMovieQuery = await db.collection('movies').where('tmdbId', '==', tmdbMovieId).limit(1).get();
-                let firestoreMovieId = null;
+                // Check if this content (by TMDb ID) already exists in Firestore's 'movies' collection
+                const existingContentQuery = await db.collection('movies').where('tmdbId', '==', tmdbContentId).limit(1).get();
+                let firestoreDocId = null; 
 
-                if (!existingMovieQuery.empty) {
-                    firestoreMovieId = existingMovieQuery.docs[0].id;
-                    console.log('Movie already exists in Firestore with ID:', firestoreMovieId);
+                if (!existingContentQuery.empty) {
+                    firestoreDocId = existingContentQuery.docs[0].id;
+                    console.log('Content already exists in Firestore with ID:', firestoreDocId);
                     
-                    urlToEditId = firestoreMovieId; 
+                    urlToEditId = firestoreDocId; 
                     await checkEditMode(); 
-                    showStatusMessage(`Movie already exists! Loading your personal details for "${movie.title}".`, 'info');
+                    showStatusMessage(`Content already exists! Loading your personal details for "${content.title || content.name}".`, 'info'); 
                     
                 } else {
-                    console.log('Movie not yet in Firestore, preparing for new entry.');
+                    console.log('Content not yet in Firestore, preparing for new entry.');
                     editingMovieId = null; 
-                    document.getElementById('formTitle').textContent = 'Add New Movie';
-                    document.getElementById('submitBtn').textContent = 'Add Movie';
+                    document.getElementById('formTitle').textContent = 'Add New Content'; // Updated title
+                    document.getElementById('submitBtn').textContent = 'Add Content'; // Updated button
                 }
 
 
                 document.getElementById('movieSearch').value = '';
                 document.getElementById('searchResults').innerHTML = '';
                 
-                showAlertModal('Details Loaded', `Details for "${movie.title}" have been loaded into the form. You can now add your personal rating and notes!`);
+                showAlertModal('Details Loaded', `Details for "${content.title || content.name}" have been loaded into the form. You can now add your personal rating and notes!`); 
 
             } catch (error) {
-                console.error('Error selecting movie:', error);
-                showStatusMessage('Error loading movie details: ' + error.message, 'error');
-                showAlertModal('Error', 'Error loading movie details. Please try again or fill in the details manually.');
+                console.error('Error selecting content:', error); 
+                showStatusMessage('Error loading content details: ' + error.message, 'error'); 
+                showAlertModal('Error', 'Error loading content details. Please try again or fill in the details manually.'); 
             }
         }
     </script>
