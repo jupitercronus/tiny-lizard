@@ -990,11 +990,18 @@
                 // Fetch all user profiles to get display names - ONLY IF LOGGED IN
                 userProfiles = {}; 
                 if (currentUser) { 
-                    const usersSnapshot = await db.collection('users').get();
-                    usersSnapshot.docs.forEach(doc => {
-                        userProfiles[doc.id] = doc.data();
-                    });
-                    console.log("User profiles loaded:", Object.keys(userProfiles).length);
+                    try {
+                        const usersSnapshot = await db.collection('users').get();
+                        usersSnapshot.docs.forEach(doc => {
+                            const userData = doc.data();
+                            userProfiles[doc.id] = userData;
+                            console.log(`Loaded profile for user ${doc.id}:`, userData);
+                        });
+                        console.log("User profiles loaded:", Object.keys(userProfiles).length);
+                    } catch (error) {
+                        console.error("Error loading user profiles:", error);
+                        // Continue without user profiles if there's an error
+                    }
                 }
 
 
