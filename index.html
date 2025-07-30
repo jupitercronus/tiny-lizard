@@ -8,8 +8,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
-    <!-- Optional: If you enabled Analytics -->
-    <!-- <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-analytics-compat.js"></script> -->
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -117,34 +115,6 @@
             margin-bottom: 30px;
         }
 
-        .stats-grid { /* REMOVED FROM HTML */
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card { /* REMOVED FROM HTML */
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border: 1px solid #ddd;
-        }
-
-        .stat-number { /* REMOVED FROM HTML */
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #007bff;
-            margin-bottom: 10px;
-        }
-
-        .stat-label { /* REMOVED FROM HTML */
-            color: #666;
-            font-size: 1.1em;
-        }
-
         .controls-section {
             display: flex;
             justify-content: space-between;
@@ -174,37 +144,6 @@
             outline: none;
             border-color: #007bff;
             box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-        }
-
-        .filter-controls { /* REMOVED FROM HTML */
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        /* NEW STYLES FOR VIEW MODE BUTTONS */
-        .view-mode-controls { /* REMOVED FROM HTML */
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            margin-top: 15px; 
-            justify-content: flex-end; 
-        }
-
-        .view-mode-btn { /* REMOVED FROM HTML */
-            background: white;
-            color: #333;
-            border: 1px solid #ddd;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .view-mode-btn:hover,
-        .view-mode-btn.active { /* REMOVED FROM HTML */
-            background: #28a745; /* Green for view modes */
-            color: white;
-            border-color: #28a745;
         }
         
         /* Styles for "Add to My Collection" and "Add to List" buttons */
@@ -241,18 +180,21 @@
 
         /* NEW: Styles for dropdown filter */
         .filter-dropdown {
-            padding: 8px 12px;
+            padding: 10px 12px;
             border: 1px solid #ddd;
             border-radius: 5px;
             background-color: white;
             font-size: 16px;
             color: #333;
             cursor: pointer;
-            appearance: none; /* Remove default dropdown arrow */
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%2C197.3L159.9%2C69.8c-1.8-1.8-4.7-1.8-6.5%2C0L5.4%2C197.3c-1.8%2C1.8-1.8%2C4.7%2C0%2C6.5l14.4%2C14.4c1.8%2C1.8%2C4.7%2C1.8%2C6.5%2C0l118.8-118.7l118.8%2C118.7c1.8%2C1.8%2C4.7%2C1.8%2C6.5%2C0l14.4-14.4C288.8%2C202%2C288.8%2C199.1%2C287%2C197.3z%22%2F%3E%3C%2Fsvg%3E');
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2C69.4L159.9%2C196.5c-1.8%2C1.8-4.7%2C1.8-6.5%2C0L25.9%2C69.4c-1.8-1.8-1.8-4.7%2C0-6.5l14.3-14.3c1.8-1.8%2C4.7-1.8%2C6.5%2C0l112.2%2C112.2l112.2-112.2c1.8-1.8%2C4.7-1.8%2C6.5%2C0l14.3%2C14.3C288.8%2C64.7%2C288.8%2C67.6%2C287%2C69.4z%22%2F%3E%3C%2Fsvg%3E');
             background-repeat: no-repeat;
-            background-position: right 8px top 50%;
-            background-size: 12px auto;
+            background-position: right 12px center;
+            background-size: 10px auto;
+            padding-right: 35px;
         }
 
 
@@ -269,6 +211,8 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             border: 1px solid #ddd;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
         }
 
         .movie-card:hover {
@@ -286,6 +230,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
         }
 
         .movie-poster img {
@@ -299,11 +244,18 @@
             font-size: 14px;
         }
 
+        .movie-card-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
         .movie-title {
             font-size: 1.3em;
             font-weight: bold;
             color: #333;
             margin-bottom: 8px;
+            cursor: pointer;
         }
 
         .movie-year {
@@ -360,6 +312,7 @@
             font-size: 0.85em;
             color: #666;
             line-height: 1.4;
+            flex-grow: 1;
         }
         .movie-overview, .movie-cast { /* NEW STYLE */
             margin-top: 5px;
@@ -627,10 +580,6 @@
                 font-size: 2em;
             }
 
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
             .controls-section {
                 flex-direction: column;
                 align-items: stretch;
@@ -660,82 +609,49 @@
             <div class="nav-links">
                 <a href="index.html" class="nav-link active">Library</a>
                 <a href="lists.html" class="nav-link">Lists</a> 
-                <a href="profile.html" class="nav-link">Profile</a> <!-- Updated href -->
-                <a id="addMovieNavbarBtn" href="add-movie.html" class="add-movie-btn">+ Add Movie</a> 
-                <button id="logoutBtn" class="logout-btn">Logout</button>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <a id="addMovieNavbarBtn" href="add-movie.html" class="add-movie-btn">+ Add Media</a> 
+                <button id="authBtn" class="logout-btn">Login</button>
             </div>
         </div>
     </nav>
 
     <div class="main-container">
         <div class="hero-section">
-            <h1 class="hero-title">Movies</h1>
-            <!-- REMOVED: <p class="hero-subtitle">Track, rate, and organize your DVD library</p> -->
-            <!-- REMOVED: <p id="userStatus" style="font-size: 0.9em; color: #888; margin-top: -15px;"></p> -->
+            <h1 class="hero-title">welcome to your swamp</h1>
         </div>
-
-        <!-- REMOVED STATS GRID FROM HERE -->
-        <!--
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number" id="totalMovies">0</div>
-                <div class="stat-label">Total Movies</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="watchedMovies">0</div>
-                <div class="stat-label">Watched</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="avgRating">0.0</div>
-                <div class="stat-label">Average Rating</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="totalHours">0</div>
-                <div class="stat-label">Hours Watched</div>
-            </div>
-        </div>
-        -->
 
         <div class="controls-section">
             <div class="search-bar">
                 <input type="text" id="searchInput" placeholder="Search your collection...">
             </div>
-            <!-- REMOVED FILTER BUTTONS -->
-            <!--
-            <div class="filter-controls">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="watched">Watched</button>
-                <button class="filter-btn" data-filter="unwatched">Unwatched</button>
-                <button class="filter-btn" data-filter="favorites">5 Stars</button>
-            </div>
-            -->
-            <!-- NEW: Filter/Sort Dropdown -->
+            
             <select id="filterSortDropdown" class="filter-dropdown">
-                <option value="all">All Content</option> <!-- Renamed -->
-                <option value="my">My Content</option> <!-- Renamed -->
-                <option value="watched">Watched</option>
-                <option value="unwatched">Unwatched</option>
-                <option value="favorites">5 Stars</option>
-                <option value="mostLiked">Most Liked</option>
-                <option value="leastLiked">Least Liked</option> 
-                <option value="moviesOnly">Movies Only</option> 
-                <option value="tvShowsOnly">TV Shows Only</option> 
+                <option value="all">All Media</option>
+                <option value="my">My Media</option>
+                <optgroup label="Filter By">
+                    <option value="watched">Watched</option>
+                    <option value="unwatched">Unwatched</option>
+                    <option value="favorites">5 Stars</option>
+                    <option value="moviesOnly">Movies Only</option> 
+                    <option value="tvShowsOnly">TV Shows Only</option> 
+                </optgroup>
+                <optgroup label="Sort By">
+                    <option value="mostLiked">Rating (Highest)</option>
+                    <option value="leastLiked">Rating (Lowest)</option> 
+                    <option value="titleAsc">Title (A-Z)</option>
+                    <option value="titleDesc">Title (Z-A)</option>
+                    <option value="releaseDateDesc">Release Date (Newest)</option>
+                    <option value="releaseDateAsc">Release Date (Oldest)</option>
+                </optgroup>
             </select>
-
-            <!-- REMOVED: View Mode Controls (redundant with dropdown) -->
-            <!--
-            <div class="view-mode-controls">
-                <button class="view-mode-btn active" data-view="my">My Movies</button>
-                <button class="view-mode-btn" data-view="all">All Movies</button>
-            </div>
-            -->
         </div>
 
         <div id="moviesContainer">
             <div class="empty-state">
                 <h3>Your collection is empty</h3>
-                <p>Start building your movie library by adding your first DVD!</p>
-                <a id="addFirstMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Your First Movie</a> 
+                <p>Start building your library by adding your first media!</p>
+                <a id="addFirstMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Your First Media</a> 
             </div>
         </div>
     </div>
@@ -775,7 +691,7 @@
                     <p><strong>Year:</strong> <span id="modalYear"></span></p>
                     <p><strong>Director:</strong> <span id="modalDirector"></span></p>
                     <p><strong>Genre:</strong> <span id="modalGenre"></span></p>
-                    <p><strong>Runtime:</strong> <span id="modalRuntime"></span> min</p>
+                    <p><strong>Runtime:</strong> <span id="modalRuntime"></span></p>
                     <p><strong>Content Type:</strong> <span id="modalContentType"></span></p>
                     <p><strong>Added by:</strong> <span id="modalUploader"></span></p>
                 </div>
@@ -806,9 +722,9 @@
 
     <script>
         // Global variables
-        let movies = []; 
+        let allMovies = []; // This will hold the master list of all movies from the DB
+        let displayedMovies = []; // This will hold the currently filtered/sorted list for display
         let currentUser = null; 
-        let currentViewMode = 'my'; // This will now be derived from currentFilterSort
         let myInteractions = {}; 
         let currentFilterSort = 'all'; 
         let userProfiles = {}; 
@@ -851,7 +767,6 @@
             };
         }
 
-        // NEW: Function to close the movie details modal
         function closeMovieDetailsModal() {
             document.getElementById('movieDetailsModal').style.display = 'none';
         }
@@ -874,277 +789,182 @@
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {
-            setupSearch();
-            setupFilterSortDropdown(); 
-            setupLogout(); 
+            setupEventListeners();
             
-            // Setup close listeners for the new movie details modal
-            document.getElementById('closeMovieDetailsModal').addEventListener('click', closeMovieDetailsModal);
-            document.getElementById('movieDetailsModal').addEventListener('click', (e) => {
-                if (e.target.id === 'movieDetailsModal') { // Only close if clicked on the overlay, not content
-                    closeMovieDetailsModal();
-                }
-            });
-
-
-            // Listen for authentication state changes
             auth.onAuthStateChanged(user => {
                 const addMovieNavbarBtn = document.getElementById('addMovieNavbarBtn');
                 const addFirstMovieBtn = document.getElementById('addFirstMovieBtn');
-                const logoutBtn = document.getElementById('logoutBtn');
+                const authBtn = document.getElementById('authBtn');
                 
                 if (user) {
                     currentUser = user;
                     console.log('User logged in:', user.email, 'UID:', user.uid);
-                    
-                    // UI for logged-in user
+                    authBtn.textContent = 'Logout';
                     addMovieNavbarBtn.href = 'add-movie.html';
-                    addFirstMovieBtn.href = 'add-movie.html';
-                    logoutBtn.textContent = 'Logout';
-                    logoutBtn.onclick = setupLogout; 
-                    
-                    loadMoviesFromFirestore(document.getElementById('filterSortDropdown').value); 
-                    updateSearchBarPlaceholder(); 
+                    if(addFirstMovieBtn) addFirstMovieBtn.href = 'add-movie.html';
                 } else {
                     currentUser = null;
-                    console.log('User not logged in, adjusting UI for unauthenticated access.');
-                    
-                    // UI for unauthenticated user
-                    addMovieNavbarBtn.href = 'auth.html'; 
-                    addFirstMovieBtn.href = 'auth.html'; 
-                    logoutBtn.textContent = 'Login'; 
-                    logoutBtn.onclick = redirectToAuth; 
-                    
-                    // Force 'All Content' view for unauthenticated users via dropdown
-                    document.getElementById('filterSortDropdown').value = 'all'; 
-
-                    loadMoviesFromFirestore('all'); 
-                    updateSearchBarPlaceholder(); 
+                    console.log('User not logged in.');
+                    authBtn.textContent = 'Login';
+                    addMovieNavbarBtn.href = 'auth.html';
+                    if(addFirstMovieBtn) addFirstMovieBtn.href = 'auth.html';
                 }
+                // Always reload data on auth change
+                loadAllData();
             });
         });
 
-        // --- Logout Functionality ---
-        function setupLogout() {
-            const logoutBtn = document.getElementById('logoutBtn');
-            logoutBtn.addEventListener('click', async () => {
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', () => renderMovies());
+            document.getElementById('filterSortDropdown').addEventListener('change', (e) => {
+                currentFilterSort = e.target.value;
+                renderMovies();
+            });
+            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
+            document.getElementById('closeMovieDetailsModal').addEventListener('click', closeMovieDetailsModal);
+            document.getElementById('movieDetailsModal').addEventListener('click', (e) => {
+                if (e.target.id === 'movieDetailsModal') {
+                    closeMovieDetailsModal();
+                }
+            });
+        }
+
+        async function handleAuthButtonClick() {
+            if (currentUser) {
                 try {
                     await auth.signOut();
-                    showAlertModal('Logged Out', 'You have been successfully logged out.', () => {
-                        window.location.href = 'index.html'; 
-                    });
+                    showAlertModal('Logged Out', 'You have been successfully logged out.');
                 } catch (error) {
                     console.error('Logout error:', error);
                     showAlertModal('Logout Failed', 'An error occurred during logout: ' + error.message);
                 }
-            });
-        }
-
-        // --- Filter/Sort Dropdown ---
-        function setupFilterSortDropdown() {
-            const dropdown = document.getElementById('filterSortDropdown');
-            dropdown.addEventListener('change', function() {
-                currentFilterSort = this.value;
-                // Determine currentViewMode based on dropdown selection
-                if (currentFilterSort === 'my') {
-                    currentViewMode = 'my';
-                } else {
-                    currentViewMode = 'all'; // All other filters/sorts apply to the 'all' view
-                }
-                loadMoviesFromFirestore(currentViewMode, currentFilterSort); 
-                updateSearchBarPlaceholder(); 
-            });
-        }
-
-
-        // --- Dynamic Search Bar Placeholder ---
-        function updateSearchBarPlaceholder() {
-            const searchInput = document.getElementById('searchInput');
-            if (currentViewMode === 'my') {
-                searchInput.placeholder = 'Search your content...'; 
-            } else { 
-                searchInput.placeholder = 'Search all content...'; 
+            } else {
+                window.location.href = 'auth.html';
             }
         }
 
-        // --- Firestore Integration (Loading and Deleting) ---
-        async function loadMoviesFromFirestore(viewMode, filterSort) { 
-            if (!currentUser && viewMode === 'my') { 
-                console.log("Not logged in and 'My Movies' selected, cannot load personal movies.");
-                movies = []; 
-                displayMovies();
-                updateStats();
-                return;
-            }
-
+        async function loadAllData() {
+            console.log("Starting data load...");
             try {
-                const mainMoviesRef = db.collection('movies'); 
-                const snapshot = await mainMoviesRef.get(); 
+                // Fetch all main movie documents
+                const moviesSnapshot = await db.collection('movies').get();
+                const moviesList = moviesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                let allMovies = snapshot.docs.map(doc => ({
-                    id: doc.id, 
-                    ...doc.data() 
-                }));
-                console.log("All main content loaded from Firestore:", allMovies.length);
+                // Fetch all user profiles for display names
+                const usersSnapshot = await db.collection('users').get();
+                userProfiles = {};
+                usersSnapshot.forEach(doc => {
+                    userProfiles[doc.id] = doc.data();
+                });
 
-                // Fetch all user profiles to get display names - ONLY IF LOGGED IN
-                userProfiles = {}; 
-                if (currentUser) { 
-                    try {
-                        const usersSnapshot = await db.collection('users').get();
-                        usersSnapshot.docs.forEach(doc => {
-                            const userData = doc.data();
-                            userProfiles[doc.id] = userData;
-                            console.log(`Loaded profile for user ${doc.id}:`, userData);
-                        });
-                        console.log("User profiles loaded:", Object.keys(userProfiles).length);
-                    } catch (error) {
-                        console.error("Error loading user profiles:", error);
-                        // Continue without user profiles if there's an error
-                    }
-                }
-
-
-                myInteractions = {}; 
+                // Fetch current user's interactions if logged in
+                myInteractions = {};
                 if (currentUser) {
-                    const interactionsRef = db.collection('users').doc(currentUser.uid).collection('movieInteractions');
-                    const interactionsSnapshot = await interactionsRef.get();
-
-                    interactionsSnapshot.docs.forEach(doc => {
-                        myInteractions[doc.id] = doc.data(); 
+                    const interactionsSnapshot = await db.collection('users').doc(currentUser.uid).collection('movieInteractions').get();
+                    interactionsSnapshot.forEach(doc => {
+                        myInteractions[doc.id] = doc.data();
                     });
-                    console.log("My interactions loaded:", Object.keys(myInteractions).length);
                 }
 
-                    let combinedMovies = allMovies.map(movie => {
+                // Combine all data into a single master list
+                allMovies = moviesList.map(movie => {
                     const interaction = myInteractions[movie.id];
-                    // Get original uploader's display name with better fallback
                     const uploaderProfile = userProfiles[movie.originalUploaderId];
-                    let uploaderDisplayName = 'Unknown User';
+                    const uploaderName = uploaderProfile?.displayName || movie.originalUploaderDisplayName || `User...${movie.originalUploaderId.slice(-4)}`;
                     
-                    if (uploaderProfile && uploaderProfile.displayName) {
-                        uploaderDisplayName = uploaderProfile.displayName;
-                    } else if (movie.originalUploaderId === currentUser?.uid) {
-                        // If it's the current user and we don't have their profile, use auth display name
-                        uploaderDisplayName = currentUser.displayName || currentUser.email || 'You';
-                    } else {
-                        // Try to get email from the user profiles as fallback
-                        uploaderDisplayName = uploaderProfile?.email || `User ${movie.originalUploaderId.substring(0, 8)}...`;
-                    }
-
                     return {
                         ...movie,
-                        myRating: (currentUser && interaction) ? interaction.rating : 0, 
-                        myWatched: (currentUser && interaction) ? interaction.watched : false, 
-                        myReview: (currentUser && interaction) ? interaction.review : null,
-                        myOwned: (currentUser && interaction) ? interaction.owned : false, 
-                        myWatchedDate: (currentUser && interaction) ? interaction.watchedDate : null, 
-                        isInMyCollection: (currentUser && !!interaction),
-                        originalUploaderDisplayName: uploaderDisplayName 
+                        myRating: interaction?.rating || 0,
+                        myWatched: interaction?.watched || false,
+                        myReview: interaction?.review || null,
+                        myOwned: interaction?.owned || false,
+                        myWatchedDate: interaction?.watchedDate || null,
+                        isInMyCollection: !!interaction,
+                        originalUploaderDisplayName: uploaderName
                     };
                 });
-                console.log("Combined all content with my interactions:", combinedMovies.length); 
 
-                // Apply view mode filter: 'my' means only movies present in myInteractions
-                if (viewMode === 'my') {
-                    movies = combinedMovies.filter(movie => movie.isInMyCollection); 
-                    console.log("Filtered for 'My Content' view (based on interaction records):", movies.length); 
-                } else { // viewMode === 'all'
-                    // Apply deduplication for 'All Movies' view
-                    let uniqueMoviesMap = {}; 
-                    for (const movie of combinedMovies) { 
-                        if (movie.tmdbId) { 
-                            const existingEntry = uniqueMoviesMap[movie.tmdbId];
-                            if (!existingEntry || movie.isInMyCollection) { 
-                                uniqueMoviesMap[movie.tmdbId] = movie;
-                            }
-                        } else {
-                            uniqueMoviesMap[movie.id] = movie;
-                        }
-                    }
-                    movies = Object.values(uniqueMoviesMap);
-                    console.log("Deduped content for 'All Content' view:", movies.length); 
-                }
-
-                // Apply the selected filter/sort from the dropdown (this is done on the 'movies' array after viewMode filtering)
-                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-                displayMovies(searchTerm, filterSort); 
-                updateStats();
+                console.log(`Data loaded. Total media items: ${allMovies.length}. My interactions: ${Object.keys(myInteractions).length}`);
+                renderMovies();
 
             } catch (error) {
-                console.error('Error fetching content from Firestore:', error); 
-                showAlertModal('Error', 'Failed to load content from database: ' + error.message); 
+                console.error("Error loading data from Firestore:", error);
+                showAlertModal("Loading Error", "Could not fetch data from the database. Please try again later.");
             }
         }
-
-        // Search functionality (remains the same)
-        function setupSearch() {
-            document.getElementById('searchInput').addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                displayMovies(searchTerm, currentFilterSort); 
-            });
-        }
-
-        // Display movies (now includes filter/sort logic)
-        function displayMovies(searchTerm = '', filter = 'all') { 
+        
+        function renderMovies() {
             const container = document.getElementById('moviesContainer');
-            
-            let filteredAndSortedMovies = movies; 
-            
-            // Apply search term first
-            if (searchTerm) { 
-                filteredAndSortedMovies = filteredAndSortedMovies.filter(movie => 
-                    (movie.title && movie.title.toLowerCase().includes(searchTerm)) || 
-                    (movie.name && movie.name.toLowerCase().includes(searchTerm)) || 
-                    (movie.director && movie.director.toLowerCase().includes(searchTerm)) || 
-                    (movie.genre && movie.genre.toLowerCase().includes(searchTerm)) ||
-                    (movie.overview && movie.overview.toLowerCase().includes(searchTerm)) || 
-                    (movie.cast && movie.cast.some(castMember => castMember.toLowerCase().includes(searchTerm))) 
+            let moviesToDisplay = [...allMovies];
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            // 1. Apply View Filter (My Media vs All Media)
+            const viewMode = document.getElementById('filterSortDropdown').value;
+            if (viewMode === 'my') {
+                if (!currentUser) {
+                    container.innerHTML = `<div class="empty-state"><h3>Please log in</h3><p>You need to be logged in to see your personal media.</p></div>`;
+                    return;
+                }
+                moviesToDisplay = moviesToDisplay.filter(m => m.isInMyCollection);
+            }
+
+            // 2. Apply Search Filter
+            if (searchTerm) {
+                moviesToDisplay = moviesToDisplay.filter(movie => 
+                    (movie.title && movie.title.toLowerCase().includes(searchTerm)) ||
+                    (movie.director && movie.director.toLowerCase().includes(searchTerm)) ||
+                    (movie.cast && Array.isArray(movie.cast) && movie.cast.some(c => c.toLowerCase().includes(searchTerm)))
                 );
             }
-            
-            // Apply filter/sort from dropdown
-            switch(filter) {
-                case 'all':
-                    // No additional filter/sort, just what's loaded by viewMode
-                    break;
-                case 'my': // This case should ideally not be hit as viewMode handles this
-                    filteredAndSortedMovies = filteredAndSortedMovies.filter(movie => movie.isInMyCollection);
-                    break;
+
+            // 3. Apply Content Filters
+            switch(currentFilterSort) {
                 case 'watched':
-                    filteredAndSortedMovies = filteredAndSortedMovies.filter(movie => movie.myWatched); 
+                    moviesToDisplay = moviesToDisplay.filter(m => m.myWatched);
                     break;
                 case 'unwatched':
-                    filteredAndSortedMovies = filteredAndSortedMovies.filter(movie => !movie.myWatched); 
+                    moviesToDisplay = moviesToDisplay.filter(m => m.isInMyCollection && !m.myWatched);
                     break;
                 case 'favorites':
-                    filteredAndSortedMovies = filteredAndSortedMovies.filter(movie => movie.myRating === 5); 
+                    moviesToDisplay = moviesToDisplay.filter(m => m.myRating === 5);
                     break;
-                case 'mostLiked':
-                    filteredAndSortedMovies.sort((a, b) => b.myRating - a.myRating); 
+                case 'moviesOnly':
+                    moviesToDisplay = moviesToDisplay.filter(m => m.contentType === 'movie');
                     break;
-                case 'leastLiked':
-                    filteredAndSortedMovies.sort((a, b) => a.myRating - b.myRating); 
-                    break;
-                case 'moviesOnly': 
-                    filteredAndSortedMovies = filteredAndSortedMovies.filter(movie => movie.contentType === 'movie');
-                    break;
-                case 'tvShowsOnly': 
-                    filteredAndSortedMovies = filteredAndSortedMovies.filter(movie => movie.contentType === 'tv');
+                case 'tvShowsOnly':
+                    moviesToDisplay = moviesToDisplay.filter(m => m.contentType === 'tv');
                     break;
             }
 
+            // 4. Apply Sorting
+            switch(currentFilterSort) {
+                case 'mostLiked':
+                    moviesToDisplay.sort((a, b) => b.myRating - a.myRating);
+                    break;
+                case 'leastLiked':
+                    moviesToDisplay.sort((a, b) => a.myRating - b.myRating);
+                    break;
+                case 'titleAsc':
+                    moviesToDisplay.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                    break;
+                case 'titleDesc':
+                    moviesToDisplay.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+                    break;
+                case 'releaseDateDesc':
+                    moviesToDisplay.sort((a, b) => (b.year || 0) - (a.year || 0));
+                    break;
+                case 'releaseDateAsc':
+                    moviesToDisplay.sort((a, b) => (a.year || 0) - (b.year || 0));
+                    break;
+            }
 
-            if (filteredAndSortedMovies.length === 0) { 
-                const emptyMessage = searchTerm ? 'No content found matching your search.' : 
-                                   filter !== 'all' ? `No ${filter} content in your collection.` : 
-                                   'Your collection is empty';
-                
+            // 5. Generate and display HTML
+            if (moviesToDisplay.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <h3>${emptyMessage}</h3>
-                        <p>${searchTerm || filter !== 'all' ? 'Try adjusting your search or filters.' : 'Start building your library by adding your first content!'}</p> 
-                        <a id="addFirstMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Your First Content</a> 
+                        <h3>No Media Found</h3>
+                        <p>Try adjusting your search or filters, or add some new media to your library!</p>
+                        <a id="addFirstMovieBtn" href="add-movie.html" class="add-movie-btn">+ Add Media</a>
                     </div>
                 `;
                 if (!currentUser) {
@@ -1153,62 +973,50 @@
                 return;
             }
 
-            const moviesHTML = filteredAndSortedMovies.map(movie => ` 
+            const moviesHTML = moviesToDisplay.map(movie => {
+                const title = movie.title || movie.name || 'Untitled';
+                return ` 
                 <div class="movie-card">
-                    <div class="movie-poster">
+                    <div class="movie-poster" onclick="openMovieDetailsModal('${movie.id}')">
                         ${movie.posterUrl ? 
-                            `<img src="${movie.posterUrl}" alt="${movie.title || movie.name} poster">` : 
+                            `<img src="${movie.posterUrl}" alt="${title} poster" loading="lazy">` : 
                             `<div class="no-poster">No Poster</div>`
                         }
                     </div>
-                    <div class="movie-title">
-                        ${movie.title || movie.name} 
-                        ${movie.contentType === 'tv' ? '<span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">TV Show</span>' : 
-                          movie.contentType === 'movie' ? '<span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">Movie</span>' : ''} 
-                        ${movie.myOwned ? '<span class="owned-badge">Owned</span>' : ''} 
-                    </div>
-                    ${movie.year ? `<div class="movie-year">${movie.year}</div>` : ''}
-                    
-                    ${movie.isInMyCollection ? ` 
-                        ${movie.myRating > 0 ? ` 
-                            <div class="movie-rating">
-                                ${generateStarDisplay(movie.myRating)} 
+                    <div class="movie-card-content">
+                        <div class="movie-title" onclick="openMovieDetailsModal('${movie.id}')">
+                            ${title} 
+                            ${movie.myOwned ? '<span class="owned-badge">Owned</span>' : ''} 
+                        </div>
+                        ${movie.year ? `<div class="movie-year">${movie.year}</div>` : ''}
+                        
+                        ${movie.isInMyCollection ? ` 
+                            ${movie.myRating > 0 ? `<div class="movie-rating">${generateStarDisplay(movie.myRating)}</div>` : ''}
+                            <div class="movie-status ${movie.myWatched ? 'watched' : 'unwatched'}"> 
+                                ${movie.myWatched ? '✓ Watched' : '○ Not Watched'} 
                             </div>
                         ` : ''}
-                        <div class="movie-status ${movie.myWatched ? 'watched' : 'unwatched'}"> 
-                            ${movie.myWatched ? '✓ Watched' : '○ Not Watched'} 
-                            ${movie.myWatchedDate ? ` (${movie.myWatchedDate})` : ''} 
-                        </div>
-                    ` : ''}
-                    
-                    <div class="movie-details">
-                        ${movie.director ? `<div><strong>Director:</strong> ${movie.director}</div>` : ''}
-                        ${movie.genre ? `<div><strong>Genre:</strong> ${movie.genre}</div>` : ''}
-                        ${movie.runtime ? `<div><strong>Runtime:</strong> ${movie.runtime} min</div>` : ''}
-                        ${movie.overview ? `<p class="movie-overview">${movie.overview.substring(0, 150)}${movie.overview.length > 150 ? '...' : ''}</p>` : ''}
-                        ${movie.cast && movie.cast.length > 0 ? `<p class="movie-cast"><strong>Cast:</strong> ${movie.cast.join(', ')}</p>` : ''}
-                        ${movie.isInMyCollection && movie.myReview ? `<div><strong>My Notes:</strong> ${movie.myReview.substring(0, 100)}${movie.myReview.length > 100 ? '...' : ''}</div>` : ''}
-                    </div>
-                    
-                    <div class="movie-actions">
-                        ${currentUser && movie.isInMyCollection ? ` 
-                            <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
-                            <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
-                        ` : 
-                        currentUser && !movie.isInMyCollection ? `
-                            <button class="btn-add-to-my-collection" onclick="addExistingMovieToMyCollection('${movie.id}')">Add to My Movies</button> 
-                        ` : ''}
                         
-                        ${currentUser ? `
-                            <button class="btn-add-to-list" onclick="addMovieToCustomList('${movie.id}')">Add to List</button>
-                        ` : `
-                            <button class="btn-add-to-list" onclick="redirectToAuth()">Add to List</button> 
-                        `}
+                        <div class="movie-details">
+                            ${movie.director ? `<div><strong>Director:</strong> ${movie.director}</div>` : ''}
+                            ${movie.overview ? `<p class="movie-overview">${movie.overview}</p>` : ''}
+                        </div>
+                        
+                        <div class="movie-actions">
+                            ${currentUser ? (
+                                movie.isInMyCollection ? ` 
+                                    <button class="btn-small btn-edit" onclick="editMovie('${movie.id}')">Edit</button>
+                                    <button class="btn-small btn-delete" onclick="deleteMovie('${movie.id}')">Delete</button> 
+                                ` : `
+                                    <button class="btn-add-to-my-collection" onclick="addExistingMovieToMyCollection('${movie.id}')">Add to My Media</button> 
+                                `
+                            ) : `
+                                <button class="btn-add-to-my-collection" onclick="window.location.href='auth.html'">Add to My Media</button>
+                            `}
+                        </div>
                     </div>
-                    <div style="font-size: 0.75em; color: #888; margin-top: 10px;">Added by: ${movie.originalUploaderDisplayName}</div> 
-                    <button class="btn-small" onclick="openMovieDetailsModal('${movie.id}')" style="margin-top: 10px;">View Details</button> 
                 </div>
-            `).join('');
+            `}).join('');
 
             container.innerHTML = `<div class="movies-grid">${moviesHTML}</div>`;
         }
@@ -1221,178 +1029,74 @@
             return stars;
         }
 
-        function updateStats() {
-            const totalMovies = movies.length;
-            const watchedMovies = movies.filter(m => m.myWatched).length; 
-            const ratedMovies = movies.filter(m => m.myRating > 0); 
-            const avgRating = ratedMovies.length > 0 
-                ? (ratedMovies.reduce((sum, m) => sum + m.myRating, 0) / ratedMovies.length).toFixed(1)
-                : '0.0';
-            
-            const totalHours = movies
-                .filter(m => m.myWatched && m.runtime) 
-                .reduce((sum, m) => sum + parseInt(m.runtime), 0);
-            const hoursDisplay = Math.round(totalHours / 60);
-        }
-
         function editMovie(movieId) {
-            if (!currentUser) {
-                showAlertModal('Authentication Required', 'You must be logged in to edit movies.');
-                return;
-            }
             window.location.href = `add-movie.html?edit=${movieId}`;
         }
 
         async function deleteMovie(movieId) { 
-            showConfirmationModal('Delete Movie', 'Are you sure you want to delete this movie from your movies?', async (confirmed) => { 
-                if (confirmed) {
+            showConfirmationModal('Delete From Your Media', 'Are you sure you want to remove this from your personal collection?', async (confirmed) => { 
+                if (confirmed && currentUser) {
                     try {
-                        if (!currentUser) {
-                            showAlertModal('Authentication Required', 'You must be logged in.');
-                            return;
-                        }
-
-                        const movieToDelete = movies.find(m => m.id === movieId);
-                        if (!movieToDelete) {
-                            showAlertModal('Error', 'Movie not found in your current list.');
-                            return;
-                        }
-
-                        if (movieToDelete.originalUploaderId === currentUser.uid) {
-                            await db.collection('movies').doc(movieId).delete();
-                            await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
-                            showAlertModal('Success', 'Movie (and your personal data for it) deleted successfully!');
-                            console.log('Main movie document and user interaction deleted by original uploader.');
-                        } else {
-                            await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
-                            showAlertModal('Success', 'Your personal data (rating, watched, review) for this movie has been removed.');
-                            console.log('User interaction deleted (not original uploader).');
-                        }
-                        
-                        loadMoviesFromFirestore(currentViewMode, currentFilterSort); 
-
+                        // We only ever delete the *interaction*, not the main movie document from the index page.
+                        await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieId).delete();
+                        showAlertModal('Success', 'The item has been removed from your media.');
+                        loadAllData(); // Reload all data to reflect the change
                     } catch (error) {
-                        console.error('Error deleting movie/interaction from Firestore:', error);
-                        showAlertModal('Error', 'Failed to delete movie/interaction: ' + error.message);
+                        console.error('Error deleting interaction from Firestore:', error);
+                        showAlertModal('Error', 'Failed to remove item: ' + error.message);
                     }
                 }
             });
         }
 
-        function redirectToAuth() {
-            window.location.href = 'auth.html';
-        }
-
-        async function addExistingMovieToMyCollection(movieId) {
-            if (!currentUser) {
-                showAlertModal('Authentication Required', 'You must be logged in to add movies to your collection.');
-                return;
-            }
+        function addExistingMovieToMyCollection(movieId) {
             window.location.href = `add-movie.html?edit=${movieId}`;
-        }
-
-        async function addMovieToCustomList(movieId) {
-            if (!currentUser) {
-                showAlertModal('Authentication Required', 'You must be logged in to add movies to a list.');
-                return;
-            }
-
-            const movieToAdd = movies.find(m => m.id === movieId);
-            if (!movieToAdd) {
-                showAlertModal('Error', 'Movie not found. Cannot add to list.');
-                return;
-            }
-
-            showAlertModal('Add to List', `"${movieToAdd.title || movieToAdd.name}" added to a list! (Functionality to choose list coming soon.)`); 
-            console.log(`Placeholder: Add movie ${movieId} ("${movieToAdd.title || movieToAdd.name}") to a custom list.`);
         }
 
         async function openMovieDetailsModal(movieId) {
             const modal = document.getElementById('movieDetailsModal');
-            document.getElementById('modalTitle').textContent = 'Loading...';
-            document.getElementById('modalPosterContainer').innerHTML = '';
-            document.getElementById('modalYear').textContent = '';
-            document.getElementById('modalDirector').textContent = '';
-            document.getElementById('modalGenre').textContent = '';
-            document.getElementById('modalRuntime').textContent = '';
-            document.getElementById('modalContentType').textContent = '';
-            document.getElementById('modalUploader').textContent = '';
-            document.getElementById('modalOverview').textContent = '';
-            document.getElementById('modalCast').textContent = '';
-            document.getElementById('modalMyRating').innerHTML = '';
-            document.getElementById('modalMyStatus').innerHTML = '';
-            document.getElementById('modalMyReview').textContent = '';
-            document.getElementById('modalMyWatchedDate').textContent = '';
-            document.getElementById('modalMyOwned').textContent = '';
-            document.getElementById('modalPersonalDetails').style.display = 'none'; 
-
             modal.style.display = 'flex'; 
 
-            try {
-                const movieDoc = await db.collection('movies').doc(movieId).get();
-                if (!movieDoc.exists) {
-                    showAlertModal('Error', 'Content details not found.'); 
-                    closeMovieDetailsModal();
-                    return;
-                }
-                const movieData = movieDoc.data();
-
-                let userInteractionData = null;
-                if (currentUser) {
-                    const interactionDoc = await db.collection('users').doc(currentUser.uid)
-                                                    .collection('movieInteractions').doc(movieId).get();
-                    if (interactionDoc.exists) {
-                        userInteractionData = interactionDoc.data();
-                    }
-                }
-
-                document.getElementById('modalTitle').textContent = movieData.title || movieData.name || 'Unknown Title'; 
-                
-                if (movieData.posterUrl) {
-                    document.getElementById('modalPosterContainer').innerHTML = `<img src="${movieData.posterUrl}" alt="${movieData.title || movieData.name} poster">`; 
-                } else {
-                    document.getElementById('modalPosterContainer').innerHTML = `<div class="no-poster">No Poster</div>`;
-                }
-
-                document.getElementById('modalYear').textContent = movieData.year || (movieData.first_air_date ? new Date(movieData.first_air_date).getFullYear() : 'N/A'); 
-                document.getElementById('modalDirector').textContent = movieData.director || 'N/A';
-                document.getElementById('modalGenre').textContent = movieData.genre || 'N/A';
-                document.getElementById('modalRuntime').textContent = movieData.runtime ? `${movieData.runtime} min` : (movieData.episode_run_time?.[0] ? `${movieData.episode_run_time[0]} min (per episode)` : 'N/A'); 
-                document.getElementById('modalContentType').textContent = movieData.contentType === 'tv' ? 'TV Show' : (movieData.contentType === 'movie' ? 'Movie' : 'N/A'); 
-                document.getElementById('modalUploader').textContent = movieData.originalUploaderDisplayName || 'N/A';
-                document.getElementById('modalOverview').textContent = movieData.overview || 'No summary available.';
-                document.getElementById('modalCast').textContent = (movieData.cast && movieData.cast.length > 0) ? movieData.cast.join(', ') : 'N/A';
-
-                if (userInteractionData) {
-                    document.getElementById('modalPersonalDetails').style.display = 'block';
-                    document.getElementById('modalMyRating').innerHTML = userInteractionData.rating > 0 ? generateStarDisplay(userInteractionData.rating) : 'Not Rated';
-                    document.getElementById('modalMyStatus').innerHTML = userInteractionData.watched ? '✓ Watched' : '○ Not Watched';
-                    document.getElementById('modalMyReview').textContent = userInteractionData.review || 'No personal notes.';
-                    document.getElementById('modalMyWatchedDate').textContent = userInteractionData.watchedDate || 'N/A';
-                    document.getElementById('modalMyOwned').textContent = userInteractionData.owned ? 'Yes' : 'No';
-
-                    const modalEditBtn = document.getElementById('modalEditBtn');
-                    const modalDeleteBtn = document.getElementById('modalDeleteBtn');
-
-                    modalEditBtn.onclick = () => {
-                        closeMovieDetailsModal();
-                        editMovie(movieId); 
-                    };
-                    modalDeleteBtn.onclick = () => {
-                        closeMovieDetailsModal();
-                        deleteMovie(movieId); 
-                    };
-                    modalEditBtn.style.display = 'inline-block'; 
-                    modalDeleteBtn.style.display = 'inline-block'; 
-
-                } else {
-                    document.getElementById('modalPersonalDetails').style.display = 'none'; 
-                }
-
-            } catch (error) {
-                console.error('Error opening content details modal:', error); 
-                showAlertModal('Error', 'Failed to load content details: ' + error.message); 
+            const movieData = allMovies.find(m => m.id === movieId);
+            if (!movieData) {
+                showAlertModal('Error', 'Could not find details for this item.');
                 closeMovieDetailsModal();
+                return;
+            }
+
+            const title = movieData.title || movieData.name || 'Unknown Title';
+            document.getElementById('modalTitle').textContent = title;
+            
+            if (movieData.posterUrl) {
+                document.getElementById('modalPosterContainer').innerHTML = `<img src="${movieData.posterUrl}" alt="${title} poster">`; 
+            } else {
+                document.getElementById('modalPosterContainer').innerHTML = `<div class="no-poster">No Poster</div>`;
+            }
+
+            document.getElementById('modalYear').textContent = movieData.year || 'N/A'; 
+            document.getElementById('modalDirector').textContent = movieData.director || 'N/A';
+            document.getElementById('modalGenre').textContent = movieData.genre || 'N/A';
+            document.getElementById('modalRuntime').textContent = movieData.runtime ? `${movieData.runtime} min` : 'N/A'; 
+            document.getElementById('modalContentType').textContent = movieData.contentType === 'tv' ? 'TV Show' : 'Movie'; 
+            document.getElementById('modalUploader').textContent = movieData.originalUploaderDisplayName || 'N/A';
+            document.getElementById('modalOverview').textContent = movieData.overview || 'No summary available.';
+            document.getElementById('modalCast').textContent = (movieData.cast && movieData.cast.length > 0) ? movieData.cast.join(', ') : 'N/A';
+
+            if (movieData.isInMyCollection) {
+                document.getElementById('modalPersonalDetails').style.display = 'block';
+                document.getElementById('modalMyRating').innerHTML = movieData.myRating > 0 ? generateStarDisplay(movieData.myRating) : 'Not Rated';
+                document.getElementById('modalMyStatus').innerHTML = `<div class="movie-status ${movieData.myWatched ? 'watched' : 'unwatched'}">${movieData.myWatched ? '✓ Watched' : '○ Not Watched'}</div>`;
+                document.getElementById('modalMyReview').textContent = movieData.myReview || 'No personal notes.';
+                document.getElementById('modalMyWatchedDate').textContent = movieData.myWatchedDate || 'N/A';
+                document.getElementById('modalMyOwned').textContent = movieData.myOwned ? 'Yes' : 'No';
+
+                const modalEditBtn = document.getElementById('modalEditBtn');
+                const modalDeleteBtn = document.getElementById('modalDeleteBtn');
+
+                modalEditBtn.onclick = () => { editMovie(movieId); };
+                modalDeleteBtn.onclick = () => { deleteMovie(movieId); };
+            } else {
+                document.getElementById('modalPersonalDetails').style.display = 'none'; 
             }
         }
     </script>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Movie - tiny lizard</title>
+    <title>Add Media - the library sale</title>
     <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
@@ -359,10 +359,11 @@
         <div class="nav-container">
              <a href="index.html" class="logo">the library sale</a>
                 <div class="nav-links">
-                    <a href="index.html" class="nav-link active">library</a>
-                    <a href="lists.html" class="nav-link">lists</a> 
-                    <a href="profile.html" class="nav-link">profile</a> 
-                    <button id="logoutBtn" class="logout-btn">logout</button>
+                    <a href="index.html" class="nav-link">Library</a>
+                    <a href="lists.html" class="nav-link">Lists</a> 
+                    <a href="profile.html" class="nav-link">Profile</a> 
+                    <a href="add-movie.html" class="nav-link active">Add Media</a>
+                    <button id="logoutBtn" class="logout-btn">Logout</button>
                 </div>
             </div>
     </nav>
@@ -402,11 +403,11 @@
         
         <hr>
         
-        <h3>✏️ Movie Details</h3>
+        <h3>✏️ Media Details</h3>
         <form id="movieForm">
             <div class="form-row">
                 <div class="form-group">
-                    <label for="title">Movie Title *</label>
+                    <label for="title">Title *</label>
                     <input type="text" id="title" required readonly> <!-- Added readonly -->
                 </div>
                 <div class="form-group">
@@ -477,7 +478,7 @@
 
             <div class="form-group">
                 <label for="review">Review/Notes</label>
-                <textarea id="review" rows="4" placeholder="What did you think of this movie?"></textarea>
+                <textarea id="review" rows="4" placeholder="What did you think of this media?"></textarea>
             </div>
 
             <!-- NEW: Watched Date Field -->
@@ -492,7 +493,7 @@
                 <input type="checkbox" id="ownedCheckbox" style="width: auto; margin-top: 8px;">
             </div>
             
-            <button type="submit" class="btn" id="submitBtn">Add Movie</button>
+            <button type="submit" class="btn" id="submitBtn">Add Media</button>
         </form>
     </div>
 
@@ -516,7 +517,8 @@
         let currentUser = null; 
         
         // TMDb API configuration
-        const TMDB_BASE_URL = '/api/tmdb'; // Points to your Vercel proxy endpoint
+        const TMDB_BASE_URL = '/api/tmdb'; // Points to your Vercel proxy endpoint for TMDB
+        const UPC_BASE_URL = '/api/upc';   // Points to your NEW Vercel proxy endpoint for UPC
         const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
         // Global variables to store additional TMDb data
@@ -604,31 +606,13 @@
                 if (user) {
                     currentUser = user;
                     console.log('User logged in to add-movie:', user.email, 'UID:', user.uid);
-                    showStatusMessage(`Logged in as: ${user.email}`, 'info');
-                    
-                    // Initial DB connection test for add-movie page
-                    try {
-                        const testDocRef = db.collection('movies').limit(1);
-                        await testDocRef.get(); 
-                        console.log('✅ Database connection and initial collection access successful.');
-                    } catch (err) {
-                        console.error('Initial DB connection test failed:', err);
-                        showStatusMessage('Database connection failed: ' + err.message, 'error');
-                        showAlertModal('DB Connection Error', 'Failed to connect to Firebase Firestore: ' + err.message + '. Please ensure your Firebase config is correct and Firestore rules allow access.');
-                    }
+                    showStatusMessage(`Logged in as: ${user.displayName || user.email}`, 'info');
                     
                     setupStarRating();
                     setupForm();
                     setupSearch();
                     await setupBarcodeScanner(); 
                     await checkEditMode(); 
-                    setupLogout(); 
-
-                    // For a fresh form, ensure public fields are editable initially
-                    if (!editingMovieId) { 
-                        togglePublicFieldsReadonly(false); 
-                        isPublicFieldsEditable = true; 
-                    }
                     
                 } else {
                     currentUser = null;
@@ -636,25 +620,25 @@
                     window.location.href = 'auth.html'; 
                 }
             });
-        });
 
-        // --- Logout Functionality ---
-        function setupLogout() {
+            // Centralized auth button handler
             const logoutBtn = document.getElementById('logoutBtn');
-            if (logoutBtn) { 
+            if (logoutBtn) {
                 logoutBtn.addEventListener('click', async () => {
-                    try {
-                        await auth.signOut();
-                        showAlertModal('Logged Out', 'You have been successfully logged out.', () => {
-                            window.location.href = 'auth.html'; 
-                        });
-                    } catch (error) {
-                        console.error('Logout error:', error);
-                        showAlertModal('Logout Failed', 'An error occurred during logout: ' + error.message);
+                    if (currentUser) {
+                        try {
+                            await auth.signOut();
+                            showAlertModal('Logged Out', 'You have been successfully logged out.', () => {
+                                window.location.href = 'auth.html'; 
+                            });
+                        } catch (error) {
+                            console.error('Logout error:', error);
+                            showAlertModal('Logout Failed', 'An error occurred during logout: ' + error.message);
+                        }
                     }
                 });
             }
-        }
+        });
 
         // Barcode scanner functionality
         async function setupBarcodeScanner() {
@@ -822,40 +806,18 @@
             showStatusMessage('Camera stopped', 'info');
         }
 
-        const CORS_PROXY_URL = 'https://cors-anywhere.herokuapp.com/'; 
-
+        // --- CRITICAL FIX: Barcode lookup now uses the Vercel proxy ---
         async function lookupMovieByBarcode(barcode) {
             const barcodeResultDiv = document.getElementById('barcodeResult');
             barcodeResultDiv.innerHTML = `<div class="status-message status-info">🔍 Looking up barcode: <strong>${barcode}</strong>...</div>`;
             showStatusMessage(`Looking up barcode: ${barcode}...`, 'info');
             
             try {
-                let finalProxyUrl = CORS_PROXY_URL;
-                try {
-                    const proxyTestResponse = await fetch(CORS_PROXY_URL + 'https://example.com', { method: 'HEAD' });
-                    if (proxyTestResponse.status === 403) {
-                        showStatusMessage('CORS proxy needs access. Click "Request temporary access" here: <a href="https://cors-anywhere.herokuapp.com/" target="_blank" rel="noopener noreferrer">cors-anywhere.herokuapp.com</a> first, then retry.', 'error');
-                        throw new Error('CORS proxy access denied. Please allow it first.');
-                    }
-                } catch (proxyError) {
-                    console.warn('CORS proxy test failed (likely network issue to proxy):', proxyError);
-                    showStatusMessage('Could not reach CORS proxy. Check internet connection or try searching manually.', 'error');
-                    throw new Error('CORS proxy is unreachable. Check your internet connection.');
-                }
-
-
-                // Step 1: Look up the barcode in UPC database
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); 
-
-                const upcResponse = await fetch(`${finalProxyUrl}https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`, { signal: controller.signal });
-                clearTimeout(timeoutId); 
+                // Step 1: Look up the barcode using our new Vercel proxy
+                const upcResponse = await fetch(`${UPC_BASE_URL}?upc=${barcode}`);
 
                 if (!upcResponse.ok) {
                     const errorText = await upcResponse.text();
-                    if (upcResponse.status === 403) {
-                         throw new Error(`UPC API access denied (403 Forbidden). You might be exceeding trial limits or your IP is blocked. Remember to visit ${CORS_PROXY_URL} and click "Request temporary access" first.`);
-                    }
                     throw new Error(`UPC lookup failed with status: ${upcResponse.status} ${errorText || upcResponse.statusText}`);
                 }
                 
@@ -885,8 +847,7 @@
                 const movieTitle = extractMovieTitle(productName);
                 console.log('Extracted Movie Title for TMDb:', movieTitle); 
                 
-                // Step 3: Search TMDb for the movie
-                // Use the Vercel proxy for TMDb calls
+                // Step 3: Search TMDb for the movie (using the existing Vercel proxy for TMDb)
                 const tmdbResponse = await fetch(
                     `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(movieTitle)}`
                 );
@@ -914,9 +875,8 @@
                 }
                 
                 // Step 4: Auto-select the first movie result
-                // Default to movie content type for barcode lookup, as UPCs are usually for physical movies
                 const movie = tmdbData.results[0];
-                await selectMovie(movie.id, 'movie'); // Pass 'movie' as content type
+                await selectMovie(movie.id, 'movie'); 
                 
                 setTimeout(() => {
                     barcodeResultDiv.innerHTML = `
@@ -1011,7 +971,7 @@
                 console.log('Form submitted');
                 
                 if (!currentUser) { 
-                    showAlertModal('Authentication Required', 'You must be logged in to add or update movies.');
+                    showAlertModal('Authentication Required', 'You must be logged in to add or update media.');
                     return;
                 }
 
@@ -1024,18 +984,20 @@
         }
 
         async function addMovie() { 
-            console.log('Adding movie...');
+            console.log('Adding media...');
             const submitBtn = document.getElementById('submitBtn');
             
             try {
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Adding...';
-                showStatusMessage('Adding movie to database...', 'info'); 
+                showStatusMessage('Adding media to database...', 'info'); 
                 
                 const title = document.getElementById('title').value.trim();
                 
                 if (!title) {
-                    showAlertModal('Validation Error', 'Please enter a movie title.');
+                    showAlertModal('Validation Error', 'Please enter a title.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Media';
                     return;
                 }
 
@@ -1050,6 +1012,7 @@
                     tmdbId: document.getElementById('movieForm').dataset.tmdbId ? parseInt(document.getElementById('movieForm').dataset.tmdbId) : null,
                     dateAdded: firebase.firestore.FieldValue.serverTimestamp(), 
                     originalUploaderId: currentUser.uid, 
+                    originalUploaderDisplayName: currentUser.displayName || currentUser.email, // Store display name
                     overview: document.getElementById('summary').value.trim() || null, 
                     cast: document.getElementById('cast').value.trim().split(',').map(item => item.trim()).filter(item => item !== '') || null,
                     isManualEntry: isPublicFieldsEditable, 
@@ -1072,24 +1035,14 @@
                     const existingMovieQuery = await db.collection('movies').where('tmdbId', '==', mainMovieData.tmdbId).limit(1).get();
                     if (!existingMovieQuery.empty) {
                         movieDocRef = existingMovieQuery.docs[0].ref;
-                        console.log("Movie with TMDb ID already exists. Using existing document:", movieDocRef.id);
-                        // Only update main movie data if current user is original uploader AND it was a manual entry
-                        const existingMovieInDb = existingMovieQuery.docs[0].data();
-                        if (existingMovieInDb.originalUploaderId === currentUser.uid && existingMovieInDb.isManualEntry) {
-                            await movieDocRef.update(mainMovieData); 
-                            console.log("Original uploader updated main movie data (manual entry).");
-                        } else if (existingMovieInDb.originalUploaderId === currentUser.uid && !existingMovieInDb.isManualEntry && isPublicFieldsEditable) {
-                            console.log("Original uploader attempting to edit TMDB-sourced movie. Main movie data will not be updated.");
-                        } else {
-                            console.log("Not original uploader or not a manual entry, skipping main movie update.");
-                        }
+                        console.log("Media with TMDb ID already exists. Using existing document:", movieDocRef.id);
                     }
                 }
 
                 // If movieDocRef is not set (meaning it's a truly new movie or no tmdbId), add it
                 if (!movieDocRef) {
                     movieDocRef = await db.collection('movies').add(mainMovieData);
-                    console.log("New main movie document written with ID: ", movieDocRef.id);
+                    console.log("New main media document written with ID: ", movieDocRef.id);
                 }
                 
                 // Step 2: Add/update the user's interaction data in their specific subcollection
@@ -1097,9 +1050,9 @@
                         .collection('movieInteractions').doc(movieDocRef.id) 
                         .set(userInteractionData, { merge: true }); 
 
-                console.log('Movie and user interaction added successfully!');
-                showStatusMessage('Movie added successfully!', 'success');
-                showAlertModal('Success', 'Movie added successfully!', () => {
+                console.log('Media and user interaction added successfully!');
+                showStatusMessage('Media added successfully!', 'success');
+                showAlertModal('Success', 'Media added successfully!', () => {
                     clearForm();
                     window.location.href = 'index.html'; 
                 });
@@ -1110,28 +1063,30 @@
                 showAlertModal('Error', 'An unexpected error occurred: ' + error.message);
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Add Movie';
+                submitBtn.textContent = 'Add Media';
             }
         }
 
         async function updateMovie() { 
-            console.log('Updating movie...');
+            console.log('Updating media...');
             const submitBtn = document.getElementById('submitBtn');
             
             try {
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Updating...';
-                showStatusMessage('Updating movie in database...', 'info'); 
+                showStatusMessage('Updating media in database...', 'info'); 
                 
                 const title = document.getElementById('title').value.trim();
                 
                 if (!title) {
-                    showAlertModal('Validation Error', 'Please enter a movie title.');
+                    showAlertModal('Validation Error', 'Please enter a title.');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Update Media';
                     return;
                 }
 
                 if (!currentUser) {
-                    showAlertModal('Authentication Required', 'You must be logged in to update movies.');
+                    showAlertModal('Authentication Required', 'You must be logged in to update media.');
                     return;
                 }
 
@@ -1161,16 +1116,16 @@
                 // Fetch the existing movie to check originalUploaderId and isManualEntry
                 const movieDoc = await db.collection('movies').doc(editingMovieId).get();
                 if (!movieDoc.exists) {
-                    throw new Error('Movie not found for update.');
+                    throw new Error('Media not found for update.');
                 }
                 const existingMovieData = movieDoc.data();
 
                 // Step 1: Update the main movie document (only if current user is original uploader AND it was a manual entry)
                 if (currentUser.uid === existingMovieData.originalUploaderId && existingMovieData.isManualEntry === true) {
                     await db.collection('movies').doc(editingMovieId).update(mainMovieUpdates);
-                    console.log('Main movie document updated by original uploader (manual entry).');
+                    console.log('Main media document updated by original uploader (manual entry).');
                 } else {
-                    console.log('Skipping main movie update: Not original uploader or not a manual entry.');
+                    console.log('Skipping main media update: Not original uploader or not a manual entry.');
                 }
 
                 // Step 2: Update the user's interaction data in their subcollection
@@ -1178,9 +1133,9 @@
                         .collection('movieInteractions').doc(editingMovieId)
                         .set(userInteractionUpdates, { merge: true }); 
 
-                console.log('Movie and user interaction updated successfully!');
-                showStatusMessage('Movie updated successfully!', 'success');
-                showAlertModal('Success', 'Movie updated successfully!', () => {
+                console.log('Media and user interaction updated successfully!');
+                showStatusMessage('Media updated successfully!', 'success');
+                showAlertModal('Success', 'Media updated successfully!', () => {
                     window.location.href = 'index.html'; 
                 });
                 
@@ -1190,7 +1145,7 @@
                 showAlertModal('Error', 'An unexpected error occurred: ' + error.message);
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Update Movie';
+                submitBtn.textContent = 'Update Media';
             }
         }
 
@@ -1201,8 +1156,8 @@
             currentRating = 0;
             updateStars();
             editingMovieId = null; 
-            document.getElementById('formTitle').textContent = 'Add New Movie'; // Reset title
-            document.getElementById('submitBtn').textContent = 'Add Movie'; // Reset button text
+            document.getElementById('formTitle').textContent = 'Add New Media'; // Reset title
+            document.getElementById('submitBtn').textContent = 'Add Media'; // Reset button text
             document.getElementById('statusMessage').innerHTML = '';
             selectedMovieOverview = null; 
             selectedMovieCast = []; 
@@ -1232,17 +1187,17 @@
 
             editingMovieId = movieId; 
 
-            document.getElementById('formTitle').textContent = 'Loading Content for Edit...'; // Updated title
-            showStatusMessage('Loading content for editing...', 'info'); // Updated message
+            document.getElementById('formTitle').textContent = 'Loading Content for Edit...';
+            showStatusMessage('Loading content for editing...', 'info');
 
             try {
                 // Step 1: Fetch the main movie document
                 const movieDoc = await db.collection('movies').doc(movieId).get();
 
                 if (!movieDoc.exists) {
-                    console.error('Error: Main content document not found for editing with ID:', movieId); // Updated message
-                    showStatusMessage('Content not found for editing', 'error'); // Updated message
-                    showAlertModal('Error', 'Content not found for editing. Starting a new entry.'); // Updated message
+                    console.error('Error: Main content document not found for editing with ID:', movieId);
+                    showStatusMessage('Content not found for editing', 'error');
+                    showAlertModal('Error', 'Content not found for editing. Starting a new entry.');
                     clearForm(); 
                     return;
                 }
@@ -1317,14 +1272,14 @@
                 document.getElementById('watchedDate').value = userInteractionData.watchedDate || ''; 
                 document.getElementById('ownedCheckbox').checked = userInteractionData.owned; 
                 
-                document.getElementById('formTitle').textContent = 'Edit Content'; // Updated title
-                document.getElementById('submitBtn').textContent = 'Update Content'; // Updated button
-                showStatusMessage('Content loaded for editing', 'success'); // Updated message
+                document.getElementById('formTitle').textContent = 'Edit Media';
+                document.getElementById('submitBtn').textContent = 'Update Media';
+                showStatusMessage('Content loaded for editing', 'success');
 
             } catch (error) {
-                console.error('Unexpected error loading content:', error); // Updated message
-                showStatusMessage('Unexpected error loading content: ' + error.message, 'error'); // Updated message
-                showAlertModal('Error', 'An unexpected error occurred while loading the content.'); // Updated message
+                console.error('Unexpected error loading content:', error);
+                showStatusMessage('Unexpected error loading content: ' + error.message, 'error');
+                showAlertModal('Error', 'An unexpected error occurred while loading the content.');
                 clearForm();
             }
         }
@@ -1427,8 +1382,10 @@
                         showStatusMessage(`Found ${combinedResults.length} results`, 'success'); 
                     }
                 } else {
-                    console.error('No results or unexpected response format:', combinedResults);
-                    throw new Error('No results found from TMDb or unexpected response format.');
+                    resultsDiv.innerHTML = '<p>No content found for your search.</p>';
+                    if (!isAutocomplete) { 
+                        showStatusMessage('No results found.', 'info');
+                    }
                 }
                 
             } catch (error) {
@@ -1438,13 +1395,7 @@
                     resultsDiv.innerHTML = `
                         <div class="status-message status-error">
                             <p>❌ Error searching content: ${error.message}</p>
-                            <p>This might be due to:</p>
-                            <ul style="text-align: left; margin: 10px 0;">
-                                <li>Network connectivity issues</li>
-                                <li>TMDb API service down</li>
-                                <li>Invalid API key</li>
-                                <li>Rate limiting</li>
-                            </ul>
+                            <p>This might be due to network issues or an API problem.</p>
                             <p>Try again in a few moments.</p>
                         </div>
                     `;
@@ -1584,8 +1535,8 @@
                 } else {
                     console.log('Content not yet in Firestore, preparing for new entry.');
                     editingMovieId = null; 
-                    document.getElementById('formTitle').textContent = 'Add New Content'; 
-                    document.getElementById('submitBtn').textContent = 'Add Content'; 
+                    document.getElementById('formTitle').textContent = 'Add New Media'; 
+                    document.getElementById('submitBtn').textContent = 'Add Media'; 
                 }
 
 
