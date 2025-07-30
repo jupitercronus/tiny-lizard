@@ -1016,11 +1016,21 @@
                     console.log("My interactions loaded:", Object.keys(myInteractions).length);
                 }
 
-                let combinedMovies = allMovies.map(movie => {
+                    let combinedMovies = allMovies.map(movie => {
                     const interaction = myInteractions[movie.id];
-                    // Get original uploader's display name
+                    // Get original uploader's display name with better fallback
                     const uploaderProfile = userProfiles[movie.originalUploaderId];
-                    const uploaderDisplayName = uploaderProfile ? uploaderProfile.displayName : 'Unknown User';
+                    let uploaderDisplayName = 'Unknown User';
+                    
+                    if (uploaderProfile && uploaderProfile.displayName) {
+                        uploaderDisplayName = uploaderProfile.displayName;
+                    } else if (movie.originalUploaderId === currentUser?.uid) {
+                        // If it's the current user and we don't have their profile, use auth display name
+                        uploaderDisplayName = currentUser.displayName || currentUser.email || 'You';
+                    } else {
+                        // Try to get email from the user profiles as fallback
+                        uploaderDisplayName = uploaderProfile?.email || `User ${movie.originalUploaderId.substring(0, 8)}...`;
+                    }
 
                     return {
                         ...movie,
