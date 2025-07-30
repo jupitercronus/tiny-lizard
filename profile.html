@@ -158,6 +158,7 @@
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px; /* Added margin for spacing */
         }
 
         .movie-list-grid {
@@ -189,6 +190,24 @@
             color: #888;
             padding: 20px;
         }
+        
+        /* NEW: Styles for dropdown filter on profile page */
+        .list-filter-dropdown {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+            font-size: 16px;
+            color: #333;
+            cursor: pointer;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%2C197.3L159.9%2C69.8c-1.8-1.8-4.7-1.8-6.5%2C0L5.4%2C197.3c-1.8%2C1.8-1.8%2C4.7%2C0%2C6.5l14.4%2C14.4c1.8%2C1.8%2C4.7%2C1.8%2C6.5%2C0l118.8-118.7l118.8%2C118.7c1.8%2C1.8%2C4.7%2C1.8%2C6.5%2C0l14.4-14.4C288.8%2C202%2C288.8%2C199.1%2C287%2C197.3z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 8px top 50%;
+            background-size: 12px auto;
+            margin-left: 15px; /* Spacing from title */
+        }
+
 
         /* Modal Styles (copied for consistency) */
         .modal {
@@ -307,10 +326,22 @@
             </div>
         </div>
 
-        <h2 class="section-title">Recently Watched</h2>
+        <h2 class="section-title">
+            Watched Content
+            <select id="watchedSortDropdown" class="list-filter-dropdown"> <!-- NEW: Dropdown for sorting watched list -->
+                <option value="watchedDateDesc">Watch Date (Newest)</option>
+                <option value="watchedDateAsc">Watch Date (Oldest)</option>
+                <option value="ratingDesc">Rating (Highest)</option>
+                <option value="ratingAsc">Rating (Lowest)</option>
+                <option value="titleAsc">Title (A-Z)</option>
+                <option value="titleDesc">Title (Z-A)</option>
+                <option value="releaseDateDesc">Release Date (Newest)</option>
+                <option value="releaseDateAsc">Release Date (Oldest)</option>
+            </select>
+        </h2>
         <div class="movie-list-section">
-            <div id="recentlyWatchedList" class="movie-list-grid">
-                <div class="empty-list">No recently watched content yet.</div>
+            <div id="watchedContentList" class="movie-list-grid"> <!-- Renamed ID -->
+                <div class="empty-list">No watched content yet.</div>
             </div>
         </div>
 
@@ -338,6 +369,7 @@
         let currentUser = null;
         let myInteractions = []; // Store raw interaction data for calculations
         let allMoviesData = {}; // Store main movie data keyed by ID for quick lookup
+        let currentWatchedSort = 'watchedDateDesc'; // NEW: Default sort for watched list
 
         // --- Modal Functions (copied for consistency) ---
         function showAlertModal(title, message, onOk = () => {}) {
@@ -374,6 +406,7 @@
         // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
             setupLogout(); // Setup logout button
+            setupWatchedSortDropdown(); // NEW: Setup dropdown for watched list
 
             // Listen for authentication state changes
             auth.onAuthStateChanged(user => {
@@ -406,6 +439,15 @@
                     }
                 });
             }
+        }
+
+        // NEW: Setup Watched Sort Dropdown
+        function setupWatchedSortDropdown() {
+            const dropdown = document.getElementById('watchedSortDropdown');
+            dropdown.addEventListener('change', function() {
+                currentWatchedSort = this.value;
+                displayWatchedContent(); // Re-display watched content with new sort
+            });
         }
 
         // --- Profile Data Loading & Display ---
@@ -446,7 +488,7 @@
 
 
                 calculateAndDisplayStats();
-                displayRecentlyWatched();
+                displayWatchedContent(); // Renamed function call
                 displayOwnedContent();
 
             } catch (error) {
@@ -485,20 +527,76 @@
             document.getElementById('totalHours').textContent = totalHours;
         }
 
-        function displayRecentlyWatched() {
-            const recentlyWatchedListDiv = document.getElementById('recentlyWatchedList');
-            let watchedMovies = myInteractions
-                .filter(item => item.watched && item.watchedDate) // Only watched items with a date
-                .sort((a, b) => new Date(b.watchedDate) - new Date(a.watchedDate)); // Sort by date descending
+        // NEW: displayWatchedContent (formerly displayRecentlyWatched)
+        function displayWatchedContent() {
+            const watchedContentListDiv = document.getElementById('watchedContentList'); // Renamed ID
+            let watchedItems = myInteractions.filter(item => item.watched); // All watched items
 
-            if (watchedMovies.length === 0) {
-                recentlyWatchedListDiv.innerHTML = '<div class="empty-list">No recently watched content yet.</div>';
+            // Apply sorting based on currentWatchedSort
+            switch(currentWatchedSort) {
+                case 'watchedDateDesc':
+                    watchedItems.sort((a, b) => {
+                        const dateA = a.watchedDate ? new Date(a.watchedDate) : new Date(0); // Undated to epoch start
+                        const dateB = b.watchedDate ? new Date(b.watchedDate) : new Date(0);
+                        return dateB - dateA; // Newest first
+                    });
+                    break;
+                case 'watchedDateAsc':
+                    watchedItems.sort((a, b) => {
+                        const dateA = a.watchedDate ? new Date(a.watchedDate) : new Date(0);
+                        const dateB = b.watchedDate ? new Date(b.watchedDate) : new Date(0);
+                        return dateA - dateB; // Oldest first
+                    });
+                    break;
+                case 'ratingDesc':
+                    watchedItems.sort((a, b) => b.rating - a.rating); // Highest rating first
+                    break;
+                case 'ratingAsc':
+                    watchedItems.sort((a, b) => a.rating - b.rating); // Lowest rating first
+                    break;
+                case 'titleAsc':
+                    watchedItems.sort((a, b) => {
+                        const titleA = allMoviesData[a.id]?.title || allMoviesData[a.id]?.name || '';
+                        const titleB = allMoviesData[b.id]?.title || allMoviesData[b.id]?.name || '';
+                        return titleA.localeCompare(titleB); // Alphabetical A-Z
+                    });
+                    break;
+                case 'titleDesc':
+                    watchedItems.sort((a, b) => {
+                        const titleA = allMoviesData[a.id]?.title || allMoviesData[a.id]?.name || '';
+                        const titleB = allMoviesData[b.id]?.title || allMoviesData[b.id]?.name || '';
+                        return titleB.localeCompare(titleA); // Alphabetical Z-A
+                    });
+                    break;
+                case 'releaseDateDesc':
+                    watchedItems.sort((a, b) => {
+                        const movieA = allMoviesData[a.id];
+                        const movieB = allMoviesData[b.id];
+                        const dateA = movieA?.year || (movieA?.first_air_date ? new Date(movieA.first_air_date).getFullYear() : 0);
+                        const dateB = movieB?.year || (movieB?.first_air_date ? new Date(movieB.first_air_date).getFullYear() : 0);
+                        return dateB - dateA; // Newest Release Date first
+                    });
+                    break;
+                case 'releaseDateAsc':
+                    watchedItems.sort((a, b) => {
+                        const movieA = allMoviesData[a.id];
+                        const movieB = allMoviesData[b.id];
+                        const dateA = movieA?.year || (movieA?.first_air_date ? new Date(movieA.first_air_date).getFullYear() : 0);
+                        const dateB = movieB?.year || (movieB?.first_air_date ? new Date(movieB.first_air_date).getFullYear() : 0);
+                        return dateA - dateB; // Oldest Release Date first
+                    });
+                    break;
+            }
+
+
+            if (watchedItems.length === 0) {
+                watchedContentListDiv.innerHTML = '<div class="empty-list">No watched content yet.</div>';
                 return;
             }
 
-            const html = watchedMovies.slice(0, 10).map(interaction => { // Show top 10 recently watched
+            const html = watchedItems.map(interaction => { 
                 const movie = allMoviesData[interaction.id];
-                if (!movie) return ''; // Skip if main movie data is missing
+                if (!movie) return ''; 
 
                 const title = movie.title || movie.name || 'Unknown';
                 const posterUrl = movie.posterUrl || 'https://placehold.co/150x225/cccccc/000000?text=No+Poster';
@@ -507,12 +605,13 @@
                     <div class="movie-list-item">
                         <img src="${posterUrl}" alt="${title} poster">
                         <p>${title}</p>
-                        <p style="font-size: 0.7em; color: #888;">Watched: ${interaction.watchedDate}</p>
+                        ${interaction.watchedDate ? `<p style="font-size: 0.7em; color: #888;">Watched: ${interaction.watchedDate}</p>` : ''}
+                        ${interaction.rating > 0 ? `<p style="font-size: 0.7em; color: #888;">Rating: ${interaction.rating}★</p>` : ''}
                     </div>
                 `;
             }).join('');
 
-            recentlyWatchedListDiv.innerHTML = html;
+            watchedContentListDiv.innerHTML = html;
         }
 
         function displayOwnedContent() {
@@ -524,7 +623,7 @@
                 return;
             }
 
-            const html = ownedMovies.slice(0, 10).map(interaction => { // Show top 10 owned
+            const html = ownedMovies.slice(0, 10).map(interaction => { 
                 const movie = allMoviesData[interaction.id];
                 if (!movie) return ''; 
 
