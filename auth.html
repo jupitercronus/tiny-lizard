@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login / Sign Up - the library sale</title> <!-- UPDATED TITLE -->
+    <title>Login / Sign Up - the library sale</title>
     <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script> <!-- NEW: Firestore SDK for user profiles -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -121,7 +121,7 @@
     <div class="auth-container">
         <h1 id="authTitle">Login</h1>
         <form id="authForm">
-            <div class="form-group" id="displayNameGroup" style="display: none;"> <!-- NEW: Display name group -->
+            <div class="form-group" id="displayNameGroup" style="display: none;">
                 <label for="displayName">Username</label>
                 <input type="text" id="displayName" placeholder="Choose a username">
             </div>
@@ -217,20 +217,38 @@
                             return;
                         }
 
-                        // Sign up the user
+                        // Sign up the user with Firebase Authentication
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const user = userCredential.user;
 
+                        // NEW: Update the Firebase Auth profile with display name
+                        await user.updateProfile({ 
+                            displayName: displayName 
+                        });
+                        console.log('Firebase Auth user profile updated with displayName:', displayName);
+
                         // Create a user profile document in Firestore
                         if (user) {
-                            await db.collection('users').doc(user.uid).set({
-                                displayName: displayName,
-                                email: user.email,
-                                dateCreated: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            console.log('User profile created in Firestore for UID:', user.uid);
+                            try {
+                                await db.collection('users').doc(user.uid).set({
+                                    displayName: displayName,
+                                    email: user.email,
+                                    dateCreated: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                                console.log('✅ User profile created in Firestore for UID:', user.uid);
+                                displayAuthMessage('Account created successfully! Redirecting...', 'success'); 
+                            } catch (firestoreError) {
+                                console.error('❌ Firestore Profile Creation Error:', firestoreError);
+                                // If profile creation fails, log the user out to prevent inconsistency
+                                await auth.signOut(); 
+                                displayAuthMessage(`Account created, but profile failed: ${firestoreError.message}. Please try again.`, 'error');
+                                return; 
+                            }
+                        } else {
+                            console.error("User object is null after signup.");
+                            displayAuthMessage('Account creation failed: User object is missing.', 'error');
+                            return; 
                         }
-                        displayAuthMessage('Account created successfully! Redirecting...', 'success');
                     }
                 } catch (error) {
                     console.error('Authentication Error:', error);
