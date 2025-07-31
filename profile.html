@@ -348,13 +348,28 @@
 
         async function loadProfileData(userId) {
             try {
-                const userDoc = await db.collection('users').doc(userId).get();
-                if (!userDoc.exists) {
+                let userDoc = await db.collection('users').doc(userId).get();
+
+                // ** THE FIX IS HERE **
+                // If the document doesn't exist AND we are viewing our own profile, create it.
+                if (!userDoc.exists && currentUser && currentUser.uid === userId) {
+                    console.log("User profile not found for current user. Creating one now...");
+                    const newUserProfile = {
+                        displayName: currentUser.displayName || currentUser.email.split('@')[0],
+                        email: currentUser.email,
+                        dateCreated: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    await db.collection('users').doc(userId).set(newUserProfile);
+                    // Re-fetch the document so the rest of the function can proceed
+                    userDoc = await db.collection('users').doc(userId).get();
+                } else if (!userDoc.exists) {
+                    // If it's for another user and it doesn't exist, then it's truly not found.
                     document.getElementById('profileDisplayName').textContent = 'User Not Found';
                     document.getElementById('profileEmail').textContent = '';
                     document.getElementById('profileContainer').innerHTML += '<p style="text-align: center;">This user profile could not be found.</p>';
                     return;
                 }
+
                 const profileData = userDoc.data();
                 document.getElementById('profileDisplayName').textContent = profileData.displayName || 'User';
                 document.getElementById('profileEmail').textContent = profileData.email;
