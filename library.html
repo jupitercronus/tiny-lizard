@@ -311,16 +311,16 @@
 
         async function loadMediaData() {
             try {
-                const [mediaDoc, physicalCopiesSnapshot, interactionDoc] = await Promise.all([
-                    db.collection('movies').doc(mediaId).get(),
-                    db.collection('movies').doc(mediaId).collection('physicalCopies').get(),
-                    currentUser ? db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(mediaId).get() : Promise.resolve(null)
-                ]);
-
+                const mediaDoc = await db.collection('movies').doc(mediaId).get();
                 if (!mediaDoc.exists) {
                     displayError("Media not found in the database.");
                     return;
                 }
+                
+                const [physicalCopiesSnapshot, interactionDoc] = await Promise.all([
+                    db.collection('movies').doc(mediaId).collection('physicalCopies').get(),
+                    currentUser ? db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(mediaId).get() : Promise.resolve(null)
+                ]);
 
                 const mediaData = mediaDoc.data();
                 const myInteraction = interactionDoc && interactionDoc.exists ? interactionDoc.data() : null;

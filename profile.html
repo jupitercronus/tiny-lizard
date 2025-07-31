@@ -320,14 +320,11 @@
                 const authBtn = document.getElementById('authBtn');
                 authBtn.textContent = user ? 'Logout' : 'Login';
 
-                if (profileUserId) {
-                    // If a user ID is in the URL, load that user's profile.
-                    loadProfileData(profileUserId);
-                } else if (currentUser) {
-                    // If no ID in URL, but user is logged in, load their own profile.
-                    loadProfileData(currentUser.uid);
+                const targetUserId = profileUserId || (currentUser ? currentUser.uid : null);
+
+                if (targetUserId) {
+                    loadProfileData(targetUserId);
                 } else {
-                    // If no ID and not logged in, redirect to login.
                     window.location.href = 'auth.html';
                 }
             });
@@ -345,17 +342,18 @@
 
         async function loadProfileData(userId) {
             try {
-                // Fetch the profile user's public info
                 const userDoc = await db.collection('users').doc(userId).get();
                 if (!userDoc.exists) {
-                    document.getElementById('profileContainer').innerHTML = '<h2>User profile not found.</h2>';
+                    // FIX: Gracefully handle non-existent user profile
+                    document.getElementById('profileDisplayName').textContent = 'User Not Found';
+                    document.getElementById('profileEmail').textContent = '';
+                    document.getElementById('profileContainer').innerHTML += '<p style="text-align: center;">This user profile could not be found.</p>';
                     return;
                 }
                 const profileData = userDoc.data();
                 document.getElementById('profileDisplayName').textContent = profileData.displayName || 'User';
                 document.getElementById('profileEmail').textContent = profileData.email;
 
-                // Fetch this user's interactions
                 const interactionsSnapshot = await db.collection('users').doc(userId).collection('movieInteractions').get();
                 const interactions = interactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 

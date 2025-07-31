@@ -20,7 +20,7 @@
         .main-container { max-width: 800px; margin: 30px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .form-group { margin-bottom: 20px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; }
-        input[type="text"], textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; }
+        input[type="text"], textarea, select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; box-sizing: border-box; }
         textarea { min-height: 100px; resize: vertical; }
         .btn-save { background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; font-size: 1.1em; cursor: pointer; }
     </style>
@@ -84,7 +84,6 @@
                     authBtn.textContent = 'Logout';
                 } else {
                     authBtn.textContent = 'Login';
-                    // Redirect if not logged in, as they can't create a list
                     window.location.href = 'auth.html';
                 }
             });
@@ -124,13 +123,20 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
+                // NOTE: For this to work, your Firestore security rules must allow
+                // authenticated users to create documents in the 'lists' collection.
+                // Example Rule:
+                // match /lists/{listId} {
+                //   allow create: if request.auth != null;
+                //   allow read: if resource.data.isPublic == true || request.auth.uid == resource.data.creatorId;
+                //   allow update, delete: if request.auth.uid == resource.data.creatorId;
+                // }
                 const docRef = await db.collection('lists').add(newList);
-                // Redirect to the edit page for the newly created list
                 window.location.href = `edit-list.html?id=${docRef.id}`;
 
             } catch (error) {
                 console.error("Error creating list:", error);
-                alert("Could not create list. Please try again.");
+                alert("Could not create list. Please check your Firestore security rules and try again.");
             }
         }
     </script>

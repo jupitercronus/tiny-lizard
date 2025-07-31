@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>the library sale</title>
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs: Using version 10.11.0 for compatibility -->
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
@@ -100,7 +100,7 @@
 
         <div class="controls-section">
             <div class="search-bar">
-                <input type="text" id="searchInput" placeholder="Search the library...">
+                <input type="text" id="searchInput" placeholder="Search by title, director, cast, genre...">
             </div>
             <div class="filter-controls">
                 <select id="viewDropdown" class="filter-dropdown">
@@ -200,8 +200,18 @@
                 mediaToDisplay = mediaToDisplay.filter(media => myInteractions[media.id]);
             }
 
+            // FIXED: Expanded search functionality
             if (searchTerm) {
-                mediaToDisplay = mediaToDisplay.filter(media => (media.title || '').toLowerCase().includes(searchTerm));
+                mediaToDisplay = mediaToDisplay.filter(media => {
+                    const title = (media.title || '').toLowerCase();
+                    const director = (media.director || '').toLowerCase();
+                    const genre = (media.genre || '').toLowerCase();
+                    const cast = Array.isArray(media.cast) ? media.cast.join(' ').toLowerCase() : '';
+                    return title.includes(searchTerm) || 
+                           director.includes(searchTerm) ||
+                           genre.includes(searchTerm) ||
+                           cast.includes(searchTerm);
+                });
             }
 
             mediaToDisplay.sort((a, b) => {
@@ -240,11 +250,15 @@
                 let actionsHTML = '';
                 let typeBadge = media.contentType === 'tv' ? '<span class="type-badge">TV Show</span>' : '';
                 
-                let addedByHTML = `
-                    <div class="media-added-by">
-                        Added by: <a href="profile.html?id=${media.originalUploaderId}">${media.originalUploaderDisplayName || 'A user'}</a>
-                    </div>
-                `;
+                let addedByHTML = '';
+                if (media.originalUploaderId && media.originalUploaderDisplayName) {
+                    addedByHTML = `
+                        <div class="media-added-by">
+                            Added by: <a href="profile.html?id=${media.originalUploaderId}">${media.originalUploaderDisplayName}</a>
+                        </div>
+                    `;
+                }
+
 
                 if (currentUser) {
                     if (interaction) {
