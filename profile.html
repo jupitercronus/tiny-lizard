@@ -320,7 +320,6 @@
                 const authBtn = document.getElementById('authBtn');
                 authBtn.textContent = user ? 'Logout' : 'Login';
                 
-                // FIX: Set the main profile link to always go to the current user's profile
                 if (user) {
                     document.getElementById('profileNav').href = `profile.html?id=${user.uid}`;
                 } else {

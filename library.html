@@ -132,19 +132,30 @@
                 }
                 const mediaData = mediaDoc.data();
                 
-                const [physicalCopiesSnapshot, allInteractionsSnapshot] = await Promise.all([
-                    db.collection('movies').doc(mediaId).collection('physicalCopies').get(),
-                    db.collectionGroup('movieInteractions').where(firebase.firestore.FieldPath.documentId(), '==', mediaId).get()
-                ]);
+                // FIX: New, robust way to fetch all comments/interactions for this media item
+                const allUsersSnapshot = await db.collection('users').get();
+                const allInteractions = [];
+                const userProfilePromises = [];
 
+                allUsersSnapshot.forEach(userDoc => {
+                    const interactionPromise = db.collection('users').doc(userDoc.id).collection('movieInteractions').doc(mediaId).get()
+                        .then(interactionDoc => {
+                            if (interactionDoc.exists) {
+                                allInteractions.push({ userId: userDoc.id, ...interactionDoc.data() });
+                            }
+                        });
+                    userProfilePromises.push(interactionPromise);
+                });
+                await Promise.all(userProfilePromises);
+
+                const physicalCopiesSnapshot = await db.collection('movies').doc(mediaId).collection('physicalCopies').get();
                 const physicalCopies = physicalCopiesSnapshot.docs.map(doc => doc.data());
-                const allInteractions = allInteractionsSnapshot.docs.map(doc => ({ userId: doc.ref.parent.parent.id, ...doc.data() }));
 
                 renderMediaPage(mediaData, allInteractions, physicalCopies);
 
             } catch (error) {
                 console.error("Error loading media data:", error);
-                displayError("An error occurred while loading the media data. This can happen if a required database index is missing. Please check the developer console for a link to create it.");
+                displayError("An error occurred while loading the media data.");
             }
         }
 
@@ -156,7 +167,6 @@
             const userIds = [...new Set(allInteractions.map(i => i.userId))];
             const userProfiles = {};
             if (userIds.length > 0) {
-                // Fetch user profiles in chunks of 10 to avoid firestore limitations
                 for (let i = 0; i < userIds.length; i += 10) {
                     const chunk = userIds.slice(i, i + 10);
                     const usersSnapshot = await db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
@@ -168,7 +178,6 @@
 
             const commentsHTML = allInteractions.length > 0 ? allInteractions.map(interaction => {
                 const user = userProfiles[interaction.userId];
-                // Only show comments from users who have a profile and have written a review
                 if (!user || !interaction.review) return '';
                 return `
                     <div class="comment-card">
