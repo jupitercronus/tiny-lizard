@@ -144,7 +144,7 @@
 
             } catch (error) {
                 console.error("Error loading media data:", error);
-                displayError("An error occurred while loading the media data.");
+                displayError("An error occurred while loading the media data. This can happen if a required database index is missing. Please check the developer console for a link to create it.");
             }
         }
 
@@ -153,19 +153,23 @@
             const title = mediaData.title || mediaData.name || "Untitled";
             const typeBadge = mediaData.contentType === 'tv' ? '<span class="type-badge">TV Show</span>' : '';
             
-            // Fetch user profiles for comments
             const userIds = [...new Set(allInteractions.map(i => i.userId))];
             const userProfiles = {};
             if (userIds.length > 0) {
-                const usersSnapshot = await db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', userIds).get();
-                usersSnapshot.forEach(doc => {
-                    userProfiles[doc.id] = doc.data();
-                });
+                // Fetch user profiles in chunks of 10 to avoid firestore limitations
+                for (let i = 0; i < userIds.length; i += 10) {
+                    const chunk = userIds.slice(i, i + 10);
+                    const usersSnapshot = await db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+                    usersSnapshot.forEach(doc => {
+                        userProfiles[doc.id] = doc.data();
+                    });
+                }
             }
 
             const commentsHTML = allInteractions.length > 0 ? allInteractions.map(interaction => {
                 const user = userProfiles[interaction.userId];
-                if (!user) return ''; // Skip if user profile not found
+                // Only show comments from users who have a profile and have written a review
+                if (!user || !interaction.review) return '';
                 return `
                     <div class="comment-card">
                         <div class="comment-header">
@@ -173,7 +177,7 @@
                             ${interaction.rating > 0 ? generateStarDisplay(interaction.rating) : ''}
                             ${currentUser && currentUser.uid === interaction.userId ? `<button class="btn-edit-comment" onclick="editMyInteraction()">Edit</button>` : ''}
                         </div>
-                        <p>${interaction.review || '<em>No review written.</em>'}</p>
+                        <p>${interaction.review}</p>
                     </div>
                 `;
             }).join('') : '<p>No comments yet. Be the first to add one!</p>';

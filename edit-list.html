@@ -19,10 +19,11 @@
         .auth-btn { background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; cursor: pointer; border: none; }
         .main-container { max-width: 1000px; margin: 30px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         #listDetailsForm .form-group { margin-bottom: 15px; }
-        #listDetailsForm input, #listDetailsForm textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; }
+        #listDetailsForm input, #listDetailsForm textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; box-sizing: border-box; }
         #listDetailsForm input { font-size: 2em; font-weight: bold; }
         #listDetailsForm textarea { min-height: 80px; }
-        .btn-save { background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
+        .save-button-container { text-align: center; margin-top: 20px; }
+        .btn-save { background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; font-size: 1.1em; cursor: pointer; }
         .add-media-section { margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
         .search-bar { display: flex; gap: 10px; }
         .search-bar input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
@@ -57,7 +58,6 @@
             <div class="form-group">
                 <textarea id="listDescription" placeholder="List description..."></textarea>
             </div>
-            <button type="submit" class="btn-save">Save Changes</button>
         </form>
 
         <div id="addMediaSection" class="add-media-section" style="display: none;">
@@ -70,6 +70,10 @@
 
         <div id="listItemsContainer">
             <div id="listItemsGrid" class="list-items-grid"></div>
+        </div>
+        
+        <div class="save-button-container" id="saveButtonContainer" style="display: none;">
+             <button type="submit" form="listDetailsForm" class="btn-save">Save Changes</button>
         </div>
     </div>
 
@@ -123,10 +127,9 @@
                 document.getElementById('listName').value = listData.listName;
                 document.getElementById('listDescription').value = listData.description || '';
                 
-                // Disable editing if not the creator
                 document.getElementById('listName').disabled = !canEdit;
                 document.getElementById('listDescription').disabled = !canEdit;
-                document.querySelector('.btn-save').style.display = canEdit ? 'inline-block' : 'none';
+                document.getElementById('saveButtonContainer').style.display = canEdit ? 'block' : 'none';
                 document.getElementById('addMediaSection').style.display = canEdit ? 'block' : 'none';
 
                 const mediaSnapshot = await db.collection('movies').get();
