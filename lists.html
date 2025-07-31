@@ -56,15 +56,27 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
+            flex-grow: 1;
         }
         .list-info h3 { margin: 0 0 10px 0; }
         .list-info h3 a { color: #333; text-decoration: none; }
         .list-info h3 a:hover { text-decoration: underline; }
-        .list-info p { margin: 0 0 10px 0; color: #666; font-size: 0.9em; }
+        .list-info p { margin: 0 0 10px 0; color: #666; font-size: 0.9em; flex-grow: 1; }
         .list-meta { font-size: 0.8em; color: #888; }
         .list-meta a { color: #0056b3; text-decoration: none; font-weight: bold; }
         .list-meta a:hover { text-decoration: underline; }
+        .list-actions { margin-top: 10px; }
+        .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; margin-right: 10px; }
+        .btn-edit { background: #007bff; color: white; }
+        .btn-delete { background: #dc3545; color: white; }
         .empty-state { text-align: center; padding: 50px; }
+        
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); text-align: center; }
+        .modal-buttons { display: flex; justify-content: center; gap: 15px; }
+        .modal-btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .modal-btn.confirm { background: #dc3545; color: white; }
+        .modal-btn.cancel { background: #6c757d; color: white; }
     </style>
 </head>
 <body>
@@ -103,6 +115,17 @@
             <div class="empty-state"><h2>Loading lists...</h2></div>
         </div>
     </div>
+    
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <h3 id="confirmationModalTitle">Confirm Action</h3>
+            <p id="confirmationModalMessage">Are you sure?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" id="confirmModalYes">Yes</button>
+                <button class="modal-btn cancel" id="confirmModalNo">No</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const firebaseConfig = {
@@ -122,8 +145,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(user => {
                 currentUser = user;
-                const authBtn = document.getElementById('authBtn');
-                authBtn.textContent = user ? 'Logout' : 'Login';
+                document.getElementById('authBtn').textContent = user ? 'Logout' : 'Login';
                 if (!user) {
                     document.querySelector('.btn-create').href = 'auth.html';
                 }
@@ -133,11 +155,8 @@
         });
 
         async function handleAuthButtonClick() {
-            if (currentUser) {
-                await auth.signOut();
-            } else {
-                window.location.href = 'auth.html';
-            }
+            if (currentUser) await auth.signOut();
+            else window.location.href = 'auth.html';
         }
 
         function loadPageData() {
@@ -219,6 +238,14 @@
                         const media = allMedia[mediaId];
                         return media && media.posterUrl ? `<img src="${media.posterUrl}" alt="">` : '';
                     }).join('');
+                    
+                    const isOwner = currentUser && currentUser.uid === list.creatorId;
+                    const actionsHTML = isOwner ? `
+                        <div class="list-actions">
+                            <a href="edit-list.html?id=${listId}" class="btn-small btn-edit">Edit</a>
+                            <button class="btn-small btn-delete" onclick="deleteList('${listId}')">Delete</button>
+                        </div>
+                    ` : '';
 
                     listsHTML += `
                         <div class="list-card">
@@ -227,6 +254,7 @@
                                 <h3><a href="edit-list.html?id=${listId}">${list.listName}</a></h3>
                                 <p class="list-meta">Created by <a href="profile.html?id=${list.creatorId}">${list.creatorDisplayName || 'Anonymous'}</a></p>
                                 <p>${list.description || ''}</p>
+                                ${actionsHTML}
                             </div>
                         </div>
                     `;
@@ -237,6 +265,33 @@
                 console.error("Error loading public lists:", error);
                 container.innerHTML = '<div class="empty-state"><h3>Could not load lists. Please try again later.</h3></div>';
             }
+        }
+        
+        function showConfirmationModal(title, message, onConfirm) {
+            const modal = document.getElementById('confirmationModal');
+            document.getElementById('confirmationModalTitle').textContent = title;
+            document.getElementById('confirmationModalMessage').textContent = message;
+            modal.style.display = 'flex'; 
+
+            const yesBtn = document.getElementById('confirmModalYes');
+            const noBtn = document.getElementById('confirmModalNo');
+
+            yesBtn.onclick = () => { modal.style.display = 'none'; onConfirm(true); };
+            noBtn.onclick = () => { modal.style.display = 'none'; onConfirm(false); };
+        }
+
+        function deleteList(listId) {
+            showConfirmationModal('Delete List', 'Are you sure you want to permanently delete this list?', async (confirmed) => {
+                if (confirmed) {
+                    try {
+                        await db.collection('lists').doc(listId).delete();
+                        loadPublicLists(); // Refresh the list view
+                    } catch (error) {
+                        console.error("Error deleting list:", error);
+                        alert("Could not delete list.");
+                    }
+                }
+            });
         }
     </script>
 </body>

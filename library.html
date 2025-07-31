@@ -34,15 +34,20 @@
         .section-divider { border: 0; height: 1px; background: #eee; margin: 30px 0; }
         .section-title { font-size: 1.8em; color: #333; margin-bottom: 20px; }
         
+        /* Ratings Section */
+        .ratings-section { display: flex; gap: 30px; align-items: center; }
+        .rating-box { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .rating-box-title { font-weight: bold; color: #555; margin-bottom: 10px; }
+        .star-display { display: inline-block; position: relative; font-size: 1.5em; color: #ddd; }
+        .star-display-filled { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; color: #ffc107; }
+        .btn-edit-comment { margin-left: auto; background: #007bff; color: white; padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; }
+
         /* Comments Section */
         .comment-card { border: 1px solid #eee; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
         .comment-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .comment-header a { font-weight: bold; text-decoration: none; color: #0056b3; }
         .comment-header a:hover { text-decoration: underline; }
-        .star-display { display: inline-block; position: relative; font-size: 1.2em; color: #ddd; }
-        .star-display-filled { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; color: #ffc107; }
-        .btn-edit-comment { margin-left: auto; background: #007bff; color: white; padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; }
-
+        
         .physical-copies-list { list-style: none; padding: 0; }
         .physical-copy-item { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 6px; margin-bottom: 10px; }
         .copy-owner a { color: #0056b3; text-decoration: none; font-weight: bold; }
@@ -132,7 +137,6 @@
                 }
                 const mediaData = mediaDoc.data();
                 
-                // FIX: New, robust way to fetch all comments/interactions for this media item
                 const allUsersSnapshot = await db.collection('users').get();
                 const allInteractions = [];
                 const userProfilePromises = [];
@@ -170,11 +174,32 @@
                 for (let i = 0; i < userIds.length; i += 10) {
                     const chunk = userIds.slice(i, i + 10);
                     const usersSnapshot = await db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
-                    usersSnapshot.forEach(doc => {
-                        userProfiles[doc.id] = doc.data();
-                    });
+                    usersSnapshot.forEach(doc => { userProfiles[doc.id] = doc.data(); });
                 }
             }
+            
+            // --- NEW: Ratings Calculation ---
+            const myInteraction = currentUser ? allInteractions.find(i => i.userId === currentUser.uid) : null;
+            const ratedInteractions = allInteractions.filter(i => i.rating > 0);
+            const averageRating = ratedInteractions.length > 0
+                ? (ratedInteractions.reduce((sum, i) => sum + i.rating, 0) / ratedInteractions.length).toFixed(1)
+                : 0;
+
+            const ratingsHTML = `
+                <div class="ratings-section">
+                    ${myInteraction ? `
+                    <div class="rating-box">
+                        <div class="rating-box-title">Your Rating</div>
+                        ${generateStarDisplay(myInteraction.rating)}
+                    </div>
+                    ` : ''}
+                    <div class="rating-box">
+                        <div class="rating-box-title">Average Rating</div>
+                        ${generateStarDisplay(averageRating)}
+                        <p style="font-size: 0.8em; color: #888;">(${ratedInteractions.length} ratings)</p>
+                    </div>
+                </div>
+            `;
 
             const commentsHTML = allInteractions.length > 0 ? allInteractions.map(interaction => {
                 const user = userProfiles[interaction.userId];
@@ -231,6 +256,11 @@
                 </div>
                 <hr class="section-divider">
                 <div>
+                    <h3 class="section-title">Ratings</h3>
+                    ${ratingsHTML}
+                </div>
+                <hr class="section-divider">
+                <div>
                     <h3 class="section-title">Comments</h3>
                     ${commentsHTML}
                 </div>
@@ -264,8 +294,8 @@
                     const alreadyAdded = (list.mediaIds || []).includes(mediaId);
                     return `
                         <div class="list-choice">
-                            <button onclick="toggleMediaInList('${listId}', ${alreadyAdded})" ${alreadyAdded ? 'style="background: #28a745; color: white;"' : ''}>
-                                ${alreadyAdded ? '✓ Added' : 'Add'}
+                            <button onclick="toggleMediaInList('${listId}', ${alreadyAdded})" class="${alreadyAdded ? 'btn-small btn-delete' : 'btn-small btn-add'}">
+                                ${alreadyAdded ? 'Remove' : 'Add'}
                             </button>
                             <span>${list.listName}</span>
                         </div>
