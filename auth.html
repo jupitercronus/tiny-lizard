@@ -142,7 +142,6 @@
     </div>
 
     <script>
-        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
             authDomain: "tiny-lizard.firebaseapp.com",
@@ -153,7 +152,6 @@
             measurementId: "G-43FM6WR90B"
         };
 
-        // Initialize Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth(); 
         const db = firebase.firestore(); 
@@ -169,11 +167,13 @@
             const displayNameGroup = document.getElementById('displayNameGroup'); 
             const displayNameInput = document.getElementById('displayName'); 
 
-            // Listen for auth state changes to redirect if already logged in
             auth.onAuthStateChanged(user => {
                 if (user) {
                     console.log('User is logged in:', user.email);
-                    window.location.href = 'index.html'; 
+                    // Check if user profile exists before redirecting
+                    ensureUserProfileExists(user).then(() => {
+                        window.location.href = 'index.html';
+                    });
                 }
             });
 
@@ -183,13 +183,13 @@
                 if (isLoginMode) {
                     authTitle.textContent = 'Login';
                     authSubmitBtn.textContent = 'Login';
-                    toggleAuthModeLink.textContent = 'Sign Up';
+                    toggleAuthModeLink.innerHTML = 'Don\'t have an account? <a href="#">Sign Up</a>';
                     displayNameGroup.style.display = 'none'; 
                     displayNameInput.removeAttribute('required'); 
                 } else {
                     authTitle.textContent = 'Sign Up';
                     authSubmitBtn.textContent = 'Sign Up';
-                    toggleAuthModeLink.textContent = 'Login';
+                    toggleAuthModeLink.innerHTML = 'Already have an account? <a href="#">Login</a>';
                     displayNameGroup.style.display = 'block'; 
                     displayNameInput.setAttribute('required', 'true'); 
                 }
@@ -208,75 +208,51 @@
                 try {
                     if (isLoginMode) {
                         await auth.signInWithEmailAndPassword(email, password);
-                        displayAuthMessage('Logged in successfully! Redirecting...', 'success');
+                        // The onAuthStateChanged listener will handle the redirect
                     } else {
-                        // Validate displayName for signup
                         if (!displayName.trim()) {
                             displayAuthMessage('Username is required for sign up.', 'error');
                             authSubmitBtn.disabled = false;
                             return;
                         }
 
-                        // Sign up the user with Firebase Authentication
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const user = userCredential.user;
 
-                        // NEW: Update the Firebase Auth profile with display name
                         await user.updateProfile({ 
                             displayName: displayName 
                         });
-                        console.log('Firebase Auth user profile updated with displayName:', displayName);
-
-                        // Create a user profile document in Firestore
-                        if (user) {
-                            try {
-                                await db.collection('users').doc(user.uid).set({
-                                    displayName: displayName,
-                                    email: user.email,
-                                    dateCreated: firebase.firestore.FieldValue.serverTimestamp()
-                                });
-                                console.log('✅ User profile created in Firestore for UID:', user.uid);
-                                displayAuthMessage('Account created successfully! Redirecting...', 'success'); 
-                            } catch (firestoreError) {
-                                console.error('❌ Firestore Profile Creation Error:', firestoreError);
-                                // If profile creation fails, log the user out to prevent inconsistency
-                                await auth.signOut(); 
-                                displayAuthMessage(`Account created, but profile failed: ${firestoreError.message}. Please try again.`, 'error');
-                                return; 
-                            }
-                        } else {
-                            console.error("User object is null after signup.");
-                            displayAuthMessage('Account creation failed: User object is missing.', 'error');
-                            return; 
-                        }
+                        
+                        // The onAuthStateChanged listener will fire and handle profile creation and redirect.
                     }
                 } catch (error) {
                     console.error('Authentication Error:', error);
-                    let errorMessage = 'An unknown error occurred.';
-                    if (error.code) {
-                        switch (error.code) {
-                            case 'auth/user-not-found':
-                            case 'auth/wrong-password':
-                                errorMessage = 'Invalid email or password.';
-                                break;
-                            case 'auth/email-already-in-use':
-                                errorMessage = 'This email is already registered. Try logging in.';
-                                break;
-                            case 'auth/weak-password':
-                                errorMessage = 'Password is too weak. Must be at least 6 characters.';
-                                break;
-                            case 'auth/invalid-email':
-                                errorMessage = 'Invalid email format.';
-                                break;
-                            default:
-                                errorMessage = `Authentication failed: ${error.message}`;
-                        }
-                    }
-                    displayAuthMessage(errorMessage, 'error');
+                    displayAuthMessage(error.message, 'error');
                 } finally {
                     authSubmitBtn.disabled = false;
                 }
             });
+
+            // NEW FUNCTION: Ensures a user document exists in Firestore.
+            async function ensureUserProfileExists(user) {
+                const userRef = db.collection('users').doc(user.uid);
+                const userDoc = await userRef.get();
+
+                if (!userDoc.exists) {
+                    console.log(`Profile for ${user.uid} not found. Creating now.`);
+                    try {
+                        await userRef.set({
+                            displayName: user.displayName || user.email.split('@')[0],
+                            email: user.email,
+                            dateCreated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log(`Profile created successfully for ${user.uid}`);
+                    } catch (error) {
+                        console.error("Failed to create user profile in Firestore:", error);
+                        // Even if this fails, we let the user proceed. The profile page has a backup check.
+                    }
+                }
+            }
 
             function displayAuthMessage(message, type) {
                 authMessageDiv.textContent = message;
