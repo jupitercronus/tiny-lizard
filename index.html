@@ -200,7 +200,6 @@
                 mediaToDisplay = mediaToDisplay.filter(media => myInteractions[media.id]);
             }
 
-            // FIXED: Expanded search functionality
             if (searchTerm) {
                 mediaToDisplay = mediaToDisplay.filter(media => {
                     const title = (media.title || '').toLowerCase();

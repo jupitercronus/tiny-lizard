@@ -18,9 +18,11 @@
         .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; }
         .auth-btn { background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; cursor: pointer; border: none; }
         .main-container { max-width: 1000px; margin: 30px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        #listDetails { margin-bottom: 20px; }
-        #listName { font-size: 2em; margin: 0; }
-        #listDescription { color: #666; }
+        #listDetailsForm .form-group { margin-bottom: 15px; }
+        #listDetailsForm input, #listDetailsForm textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; }
+        #listDetailsForm input { font-size: 2em; font-weight: bold; }
+        #listDetailsForm textarea { min-height: 80px; }
+        .btn-save { background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
         .add-media-section { margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
         .search-bar { display: flex; gap: 10px; }
         .search-bar input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
@@ -48,10 +50,15 @@
     </nav>
 
     <div class="main-container">
-        <div id="listDetails">
-            <h1 id="listName">Loading...</h1>
-            <p id="listDescription"></p>
-        </div>
+        <form id="listDetailsForm">
+            <div class="form-group">
+                <input type="text" id="listName" placeholder="List Name" required>
+            </div>
+            <div class="form-group">
+                <textarea id="listDescription" placeholder="List description..."></textarea>
+            </div>
+            <button type="submit" class="btn-save">Save Changes</button>
+        </form>
 
         <div id="addMediaSection" class="add-media-section" style="display: none;">
             <h3>Add Media to Your List</h3>
@@ -94,21 +101,16 @@
 
             auth.onAuthStateChanged(user => {
                 currentUser = user;
-                const authBtn = document.getElementById('authBtn');
-                authBtn.textContent = user ? 'Logout' : 'Login';
+                document.getElementById('authBtn').textContent = user ? 'Logout' : 'Login';
                 loadInitialData();
             });
-            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
+            document.getElementById('authBtn').addEventListener('click', () => {
+                if (currentUser) auth.signOut();
+                else window.location.href = 'auth.html';
+            });
             document.getElementById('mediaSearchInput').addEventListener('input', handleMediaSearch);
+            document.getElementById('listDetailsForm').addEventListener('submit', saveListDetails);
         });
-
-        async function handleAuthButtonClick() {
-            if (currentUser) {
-                await auth.signOut();
-            } else {
-                window.location.href = 'auth.html';
-            }
-        }
 
         async function loadInitialData() {
             try {
@@ -116,13 +118,16 @@
                 if (!listDoc.exists) throw new Error("List not found.");
                 listData = listDoc.data();
 
-                document.getElementById('listName').textContent = listData.listName;
-                document.getElementById('listDescription').textContent = listData.description;
+                const canEdit = currentUser && currentUser.uid === listData.creatorId;
 
-                // Show add media section only if the current user is the creator
-                if (currentUser && currentUser.uid === listData.creatorId) {
-                    document.getElementById('addMediaSection').style.display = 'block';
-                }
+                document.getElementById('listName').value = listData.listName;
+                document.getElementById('listDescription').value = listData.description || '';
+                
+                // Disable editing if not the creator
+                document.getElementById('listName').disabled = !canEdit;
+                document.getElementById('listDescription').disabled = !canEdit;
+                document.querySelector('.btn-save').style.display = canEdit ? 'inline-block' : 'none';
+                document.getElementById('addMediaSection').style.display = canEdit ? 'block' : 'none';
 
                 const mediaSnapshot = await db.collection('movies').get();
                 mediaSnapshot.forEach(doc => {
@@ -132,7 +137,27 @@
                 renderListItems();
             } catch (error) {
                 console.error("Error loading list:", error);
-                document.getElementById('listDetails').innerHTML = `<h1>${error.message}</h1>`;
+                document.getElementById('listDetailsForm').innerHTML = `<h1>${error.message}</h1>`;
+            }
+        }
+        
+        async function saveListDetails(e) {
+            e.preventDefault();
+            const newName = document.getElementById('listName').value.trim();
+            const newDescription = document.getElementById('listDescription').value.trim();
+            if (!newName) {
+                alert("List name cannot be empty.");
+                return;
+            }
+            try {
+                await db.collection('lists').doc(listId).update({
+                    listName: newName,
+                    description: newDescription
+                });
+                alert("List details saved!");
+            } catch (error) {
+                console.error("Error saving list details:", error);
+                alert("Could not save changes.");
             }
         }
 

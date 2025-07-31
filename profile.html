@@ -344,7 +344,6 @@
             try {
                 const userDoc = await db.collection('users').doc(userId).get();
                 if (!userDoc.exists) {
-                    // FIX: Gracefully handle non-existent user profile
                     document.getElementById('profileDisplayName').textContent = 'User Not Found';
                     document.getElementById('profileEmail').textContent = '';
                     document.getElementById('profileContainer').innerHTML += '<p style="text-align: center;">This user profile could not be found.</p>';

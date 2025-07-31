@@ -9,226 +9,53 @@
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f5f5f5;
-        }
-
-        .navbar {
-            background: #333;
-            padding: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-        }
-
-        .logo {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: white;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: white;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: background-color 0.3s ease;
-        }
-
-        .nav-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
+        .navbar { background: #333; padding: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+        .logo { font-size: 1.8em; font-weight: bold; color: white; text-decoration: none; }
+        .nav-links { display: flex; gap: 30px; align-items: center; }
+        .nav-link { color: white; text-decoration: none; font-weight: 500; padding: 8px 16px; border-radius: 6px; }
+        .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; }
+        .auth-btn { background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; cursor: pointer; border: none; }
+        .main-container { max-width: 900px; margin: 30px auto; padding: 30px 20px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .media-layout { display: flex; gap: 30px; }
+        .media-poster { flex-shrink: 0; width: 250px; }
+        .media-poster img { width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .no-poster { width: 250px; height: 375px; background: #f0f0f0; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #999; }
+        .media-info { flex-grow: 1; }
+        .media-title { font-size: 2.8em; font-weight: bold; color: #333; margin: 0 0 10px 0; }
+        .media-details p { margin: 0 0 8px 0; color: #444; }
+        .media-details strong { color: #000; }
+        .type-badge { background: #6c757d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.6em; font-weight: 600; margin-left: 10px; vertical-align: middle; }
+        .media-actions { margin-top: 20px; }
+        .btn-action { padding: 8px 16px; border-radius: 5px; text-decoration: none; font-weight: 600; border: none; cursor: pointer; margin-right: 10px; }
+        .btn-add-list { background: #17a2b8; color: white; }
+        .media-summary { margin-top: 20px; line-height: 1.6; }
+        .section-divider { border: 0; height: 1px; background: #eee; margin: 30px 0; }
+        .section-title { font-size: 1.8em; color: #333; margin-bottom: 20px; }
         
-        .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; transition: background-color 0.3s ease; }
-        .add-media-btn:hover { background: #0056b3; }
+        /* Comments Section */
+        .comment-card { border: 1px solid #eee; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .comment-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .comment-header a { font-weight: bold; text-decoration: none; color: #0056b3; }
+        .comment-header a:hover { text-decoration: underline; }
+        .star-display { display: inline-block; position: relative; font-size: 1.2em; color: #ddd; }
+        .star-display-filled { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; color: #ffc107; }
+        .btn-edit-comment { margin-left: auto; background: #007bff; color: white; padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; }
+
+        .physical-copies-list { list-style: none; padding: 0; }
+        .physical-copy-item { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 6px; margin-bottom: 10px; }
+        .copy-owner a { color: #0056b3; text-decoration: none; font-weight: bold; }
         
-        .auth-btn { 
-            background: #dc3545;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            transition: background-color 0.3s ease;
-        }
-
-        .auth-btn:hover { 
-            background: #c82333;
-        }
-
-        .main-container {
-            max-width: 900px;
-            margin: 30px auto;
-            padding: 30px 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .media-layout {
-            display: flex;
-            gap: 30px;
-        }
-
-        .media-poster {
-            flex-shrink: 0;
-            width: 250px;
-        }
-
-        .media-poster img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-        
-        .no-poster {
-            width: 250px;
-            height: 375px;
-            background: #f0f0f0;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            color: #999;
-            text-align: center;
-        }
-
-        .media-info {
-            flex-grow: 1;
-        }
-
-        .media-title {
-            font-size: 2.8em;
-            font-weight: bold;
-            color: #333;
-            margin: 0 0 10px 0;
-        }
-        
-        .media-actions {
-            margin-top: 20px;
-        }
-        
-        .btn-action {
-            padding: 8px 16px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-            border: none;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        .btn-add-list {
-            background: #17a2b8;
-            color: white;
-        }
-
-        .media-summary {
-            margin-top: 20px;
-            line-height: 1.6;
-        }
-        
-        .section-divider {
-            border: 0;
-            height: 1px;
-            background: #eee;
-            margin: 30px 0;
-        }
-        
-        .section-title {
-            font-size: 1.8em;
-            color: #333;
-            margin-bottom: 20px;
-        }
-
-        .my-interaction-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-        }
-        
-        .star-rating {
-            display: flex;
-            gap: 3px;
-            margin-bottom: 12px;
-        }
-
-        .star {
-            color: #ffc107;
-            font-size: 1.5em;
-        }
-
-        .star.empty {
-            color: #ddd;
-        }
-        
-        .btn-edit {
-            background: #007bff;
-            color: white;
-        }
-        .btn-edit:hover {
-            background: #0056b3;
-        }
-
-        .physical-copies-list {
-            list-style: none;
-            padding: 0;
-        }
-        .physical-copy-item {
-            background: #fff;
-            border: 1px solid #eee;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-        }
-        
-        .copy-owner a {
-            color: #0056b3;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .copy-owner a:hover {
-            text-decoration: underline;
-        }
-        
-        .loading-state, .error-state {
-            text-align: center;
-            font-size: 1.2em;
-            color: #666;
-            padding: 50px 0;
-        }
-        
-        /* Add to List Modal Styles */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; }
         .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); }
         .modal-content h3 { margin-top: 0; }
         #myListsContainer { max-height: 200px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; }
         .list-choice { display: block; margin-bottom: 10px; }
-        .modal-actions { text-align: right; }
-        .btn-close { background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
+        .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+        .btn-modal { padding: 8px 16px; border-radius: 5px; text-decoration: none; font-weight: 600; border: none; cursor: pointer; }
+        .btn-modal.create { background: #28a745; color: white; }
+        .btn-modal.close { background: #6c757d; color: white; }
     </style>
 </head>
 <body>
@@ -246,25 +73,19 @@
     </nav>
 
     <div class="main-container" id="mainContainer">
-        <div class="loading-state">
-            <h2>Loading Media Details...</h2>
-        </div>
+        <div class="loading-state"><h2>Loading Media Details...</h2></div>
     </div>
     
-    <!-- Add to List Modal -->
     <div id="addToListModal" class="modal">
         <div class="modal-content">
             <h3>Add to your lists</h3>
-            <div id="myListsContainer">
-                <!-- User's lists will be loaded here -->
-            </div>
+            <div id="myListsContainer"></div>
             <div class="modal-actions">
-                <a href="create-list.html" style="float: left;">Create a new list</a>
-                <button class="btn-close" onclick="closeAddToListModal()">Close</button>
+                <a href="#" id="createListBtn" class="btn-modal create">Create a new list</a>
+                <button class="btn-modal close" onclick="closeAddToListModal()">Close</button>
             </div>
         </div>
     </div>
-
 
     <script>
         const firebaseConfig = {
@@ -292,94 +113,85 @@
 
             auth.onAuthStateChanged(user => {
                 currentUser = user;
-                const authBtn = document.getElementById('authBtn');
-                authBtn.textContent = user ? 'Logout' : 'Login';
+                document.getElementById('authBtn').textContent = user ? 'Logout' : 'Login';
                 loadMediaData();
             });
             
-            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
+            document.getElementById('authBtn').addEventListener('click', () => {
+                if (currentUser) auth.signOut();
+                else window.location.href = 'auth.html';
+            });
         });
-        
-        async function handleAuthButtonClick() {
-            if (currentUser) {
-                await auth.signOut();
-                window.location.reload();
-            } else {
-                window.location.href = 'auth.html';
-            }
-        }
 
         async function loadMediaData() {
             try {
                 const mediaDoc = await db.collection('movies').doc(mediaId).get();
                 if (!mediaDoc.exists) {
-                    displayError("Media not found in the database.");
+                    displayError("Media not found.");
                     return;
                 }
+                const mediaData = mediaDoc.data();
                 
-                const [physicalCopiesSnapshot, interactionDoc] = await Promise.all([
+                const [physicalCopiesSnapshot, allInteractionsSnapshot] = await Promise.all([
                     db.collection('movies').doc(mediaId).collection('physicalCopies').get(),
-                    currentUser ? db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(mediaId).get() : Promise.resolve(null)
+                    db.collectionGroup('movieInteractions').where(firebase.firestore.FieldPath.documentId(), '==', mediaId).get()
                 ]);
 
-                const mediaData = mediaDoc.data();
-                const myInteraction = interactionDoc && interactionDoc.exists ? interactionDoc.data() : null;
-                
-                const physicalCopies = [];
-                physicalCopiesSnapshot.forEach(doc => {
-                    physicalCopies.push(doc.data());
-                });
+                const physicalCopies = physicalCopiesSnapshot.docs.map(doc => doc.data());
+                const allInteractions = allInteractionsSnapshot.docs.map(doc => ({ userId: doc.ref.parent.parent.id, ...doc.data() }));
 
-                renderMediaPage(mediaData, myInteraction, physicalCopies);
+                renderMediaPage(mediaData, allInteractions, physicalCopies);
 
             } catch (error) {
                 console.error("Error loading media data:", error);
-                displayError("An error occurred while loading the media data. Please try again.");
+                displayError("An error occurred while loading the media data.");
             }
         }
 
-        function renderMediaPage(mediaData, myInteraction, physicalCopies) {
+        async function renderMediaPage(mediaData, allInteractions, physicalCopies) {
             const container = document.getElementById('mainContainer');
             const title = mediaData.title || mediaData.name || "Untitled";
+            const typeBadge = mediaData.contentType === 'tv' ? '<span class="type-badge">TV Show</span>' : '';
             
-            let myInteractionHTML = '';
-            if (currentUser) {
-                if (myInteraction) {
-                    myInteractionHTML = `
-                        <div class="my-interaction-section">
-                            <h3 class="section-title">My Rating & Notes</h3>
-                            <div class="star-rating">${generateStarDisplay(myInteraction.rating)}</div>
-                            <p><strong>Status:</strong> ${myInteraction.watched ? 'Watched' : 'Not Watched'}</p>
-                            ${myInteraction.watchedDate ? `<p><strong>Watched Date:</strong> ${myInteraction.watchedDate}</p>` : ''}
-                            <p><strong>My Notes:</strong> ${myInteraction.review || '<em>No notes added.</em>'}</p>
-                            <button class="btn-action btn-edit" onclick="editMyInteraction()">Edit My Details</button>
-                        </div>
-                    `;
-                } else {
-                     myInteractionHTML = `
-                        <div class="my-interaction-section">
-                            <h3 class="section-title">Add to Your Collection</h3>
-                            <p>You haven't added this media to your personal collection yet.</p>
-                            <button class="btn-action btn-edit" onclick="editMyInteraction()">Add Rating & Notes</button>
-                        </div>
-                    `;
-                }
+            // Fetch user profiles for comments
+            const userIds = [...new Set(allInteractions.map(i => i.userId))];
+            const userProfiles = {};
+            if (userIds.length > 0) {
+                const usersSnapshot = await db.collection('users').where(firebase.firestore.FieldPath.documentId(), 'in', userIds).get();
+                usersSnapshot.forEach(doc => {
+                    userProfiles[doc.id] = doc.data();
+                });
             }
+
+            const commentsHTML = allInteractions.length > 0 ? allInteractions.map(interaction => {
+                const user = userProfiles[interaction.userId];
+                if (!user) return ''; // Skip if user profile not found
+                return `
+                    <div class="comment-card">
+                        <div class="comment-header">
+                            <a href="profile.html?id=${interaction.userId}">${user.displayName || 'Anonymous'}</a>
+                            ${interaction.rating > 0 ? generateStarDisplay(interaction.rating) : ''}
+                            ${currentUser && currentUser.uid === interaction.userId ? `<button class="btn-edit-comment" onclick="editMyInteraction()">Edit</button>` : ''}
+                        </div>
+                        <p>${interaction.review || '<em>No review written.</em>'}</p>
+                    </div>
+                `;
+            }).join('') : '<p>No comments yet. Be the first to add one!</p>';
 
             let physicalCopiesHTML = '';
             if (physicalCopies.length > 0) {
-                const listItems = physicalCopies.map(copy => `
-                    <li class="physical-copy-item">
-                        <strong>${copy.editionDetails || 'Standard Edition'}</strong>
-                        <span class="copy-owner">Owned by: <a href="profile.html?id=${copy.ownerId}">${copy.ownerDisplayName || 'Unknown'}</a></span>
-                    </li>
-                `).join('');
                 physicalCopiesHTML = `
                     <div>
                         <h3 class="section-title">Physical Copies (${physicalCopies.length} total)</h3>
-                        <ul class="physical-copies-list">${listItems}</ul>
-                    </div>
-                `;
+                        <ul class="physical-copies-list">
+                            ${physicalCopies.map(copy => `
+                                <li class="physical-copy-item">
+                                    <strong>${copy.editionDetails || 'Standard Edition'}</strong>
+                                    <span class="copy-owner">Owned by: <a href="profile.html?id=${copy.ownerId}">${copy.ownerDisplayName || 'Unknown'}</a></span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>`;
             }
 
             container.innerHTML = `
@@ -388,20 +200,32 @@
                         ${mediaData.posterUrl ? `<img src="${mediaData.posterUrl}" alt="${title} poster">` : '<div class="no-poster">No Poster</div>'}
                     </div>
                     <div class="media-info">
-                        <h1 class="media-title">${title}</h1>
+                        <h1 class="media-title">${title} ${typeBadge}</h1>
+                        <div class="media-details">
+                            <p><strong>Year:</strong> ${mediaData.year || 'N/A'}</p>
+                            <p><strong>Director:</strong> ${mediaData.director || 'N/A'}</p>
+                            <p><strong>Genre:</strong> ${mediaData.genre || 'N/A'}</p>
+                            <p><strong>Cast:</strong> ${mediaData.cast ? mediaData.cast.join(', ') : 'N/A'}</p>
+                        </div>
                         <div class="media-actions">
                             <button class="btn-action btn-add-list" onclick="openAddToListModal()">Add to a List...</button>
                         </div>
                         <div class="media-summary">
+                            <h4>Summary</h4>
                             <p>${mediaData.overview || 'No summary available.'}</p>
                         </div>
                     </div>
                 </div>
                 <hr class="section-divider">
-                ${myInteractionHTML}
+                <div>
+                    <h3 class="section-title">Comments</h3>
+                    ${commentsHTML}
+                </div>
                 <hr class="section-divider">
                 ${physicalCopiesHTML}
             `;
+            
+            document.getElementById('createListBtn').href = `create-list.html?mediaId=${mediaId}`;
         }
         
         async function openAddToListModal() {
@@ -440,43 +264,30 @@
             }
         }
 
-        function closeAddToListModal() {
-            document.getElementById('addToListModal').style.display = 'none';
-        }
+        function closeAddToListModal() { document.getElementById('addToListModal').style.display = 'none'; }
 
         async function toggleMediaInList(listId, alreadyAdded) {
             const operation = alreadyAdded 
                 ? firebase.firestore.FieldValue.arrayRemove(mediaId) 
                 : firebase.firestore.FieldValue.arrayUnion(mediaId);
-            
             try {
                 await db.collection('lists').doc(listId).update({ mediaIds: operation });
                 openAddToListModal(); 
             } catch (error) {
                 console.error("Error updating list:", error);
-                alert("Could not update the list. Please try again.");
+                alert("Could not update the list.");
             }
         }
         
         function generateStarDisplay(rating) {
-            let stars = '';
-            if (!rating || rating === 0) return '<em>Not rated</em>';
-            for (let i = 1; i <= 5; i++) {
-                stars += `<span class="star ${i > rating ? 'empty' : ''}">★</span>`;
-            }
-            return stars;
+            const totalStars = 5;
+            let starHTML = '★★★★★';
+            let filledWidth = (rating / totalStars) * 100;
+            return `<div class="star-display">${starHTML}<div class="star-display-filled" style="width: ${filledWidth}%;">${starHTML}</div></div>`;
         }
 
-        function editMyInteraction() {
-            if (currentUser) {
-                window.location.href = `add-movie.html?edit=${mediaId}`;
-            }
-        }
-
-        function displayError(message) {
-            const container = document.getElementById('mainContainer');
-            container.innerHTML = `<div class="error-state"><h2>Error</h2><p>${message}</p></div>`;
-        }
+        function editMyInteraction() { if (currentUser) window.location.href = `add-movie.html?edit=${mediaId}`; }
+        function displayError(message) { document.getElementById('mainContainer').innerHTML = `<div class="error-state"><h2>Error</h2><p>${message}</p></div>`; }
     </script>
 </body>
 </html>
