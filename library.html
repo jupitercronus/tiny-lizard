@@ -178,8 +178,6 @@
                 }
             }
             
-            // --- NEW: Ratings Calculation ---
-            const myInteraction = currentUser ? allInteractions.find(i => i.userId === currentUser.uid) : null;
             const ratedInteractions = allInteractions.filter(i => i.rating > 0);
             const averageRating = ratedInteractions.length > 0
                 ? (ratedInteractions.reduce((sum, i) => sum + i.rating, 0) / ratedInteractions.length).toFixed(1)
@@ -187,12 +185,6 @@
 
             const ratingsHTML = `
                 <div class="ratings-section">
-                    ${myInteraction ? `
-                    <div class="rating-box">
-                        <div class="rating-box-title">Your Rating</div>
-                        ${generateStarDisplay(myInteraction.rating)}
-                    </div>
-                    ` : ''}
                     <div class="rating-box">
                         <div class="rating-box-title">Average Rating</div>
                         ${generateStarDisplay(averageRating)}

@@ -85,6 +85,28 @@
             margin: 0 auto;
             padding: 30px 20px;
         }
+        
+        .user-search-section {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .user-search-section input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+            width: 300px;
+        }
+        .user-search-section button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
 
         .profile-section {
             background: white;
@@ -249,6 +271,11 @@
     </nav>
 
     <div class="main-container">
+        <div class="user-search-section">
+            <input type="text" id="userSearchInput" placeholder="Find user by username...">
+            <button onclick="searchForUser()">Search</button>
+        </div>
+
         <div id="profileContainer">
             <div class="profile-section">
                 <div class="profile-header">
@@ -345,13 +372,30 @@
                 window.location.href = 'auth.html';
             }
         }
+        
+        async function searchForUser() {
+            const username = document.getElementById('userSearchInput').value.trim();
+            if (!username) return;
+            
+            try {
+                const usersRef = db.collection('users');
+                const snapshot = await usersRef.where('displayName', '==', username).limit(1).get();
+                if (snapshot.empty) {
+                    alert('User not found.');
+                } else {
+                    const userId = snapshot.docs[0].id;
+                    window.location.href = `profile.html?id=${userId}`;
+                }
+            } catch (error) {
+                console.error("Error searching for user:", error);
+                alert("An error occurred while searching.");
+            }
+        }
 
         async function loadProfileData(userId) {
             try {
                 let userDoc = await db.collection('users').doc(userId).get();
 
-                // ** THE FIX IS HERE **
-                // If the document doesn't exist AND we are viewing our own profile, create it.
                 if (!userDoc.exists && currentUser && currentUser.uid === userId) {
                     console.log("User profile not found for current user. Creating one now...");
                     const newUserProfile = {
@@ -360,10 +404,8 @@
                         dateCreated: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     await db.collection('users').doc(userId).set(newUserProfile);
-                    // Re-fetch the document so the rest of the function can proceed
                     userDoc = await db.collection('users').doc(userId).get();
                 } else if (!userDoc.exists) {
-                    // If it's for another user and it doesn't exist, then it's truly not found.
                     document.getElementById('profileDisplayName').textContent = 'User Not Found';
                     document.getElementById('profileEmail').textContent = '';
                     document.getElementById('profileContainer').innerHTML += '<p style="text-align: center;">This user profile could not be found.</p>';

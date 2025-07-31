@@ -22,54 +22,61 @@
         .auth-btn { background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; cursor: pointer; border: none; transition: background-color 0.3s ease; }
         .auth-btn:hover { background: #c82333; }
         .main-container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
-        .lists-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .lists-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
         .section-title { font-size: 2em; color: #333; }
         .btn-create { background: #28a745; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; }
+        .search-bar { flex-grow: 1; max-width: 400px; }
+        .search-bar input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; }
         
         .activity-section { margin-bottom: 40px; }
-        .activity-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; }
-        .activity-item { flex-shrink: 0; width: 120px; text-align: center; }
+        .activity-grid { 
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 20px;
+        }
+        .activity-item { text-align: center; }
         .activity-item img { width: 100%; height: 180px; object-fit: cover; border-radius: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .activity-item p { font-size: 0.8em; color: #666; margin-top: 5px; }
         .activity-item a { color: #0056b3; text-decoration: none; font-weight: bold; }
         .activity-item a:hover { text-decoration: underline; }
 
-        .list-card {
+        /* NEW: Public Lists Grid Styles */
+        #listsContainer {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .list-card-grid {
             background: white;
-            margin-bottom: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            display: flex;
             overflow: hidden;
-        }
-        .list-posters {
             display: flex;
-            flex-shrink: 0;
+            flex-direction: column;
         }
-        .list-posters img {
-            width: 100px;
-            height: 150px;
+        .list-poster-single {
+            width: 100%;
+            height: 180px;
             object-fit: cover;
-            border-right: 2px solid white;
         }
         .list-info {
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             flex-grow: 1;
         }
-        .list-info h3 { margin: 0 0 10px 0; }
+        .list-info h3 { margin: 0 0 10px 0; font-size: 1.2em; }
         .list-info h3 a { color: #333; text-decoration: none; }
         .list-info h3 a:hover { text-decoration: underline; }
         .list-info p { margin: 0 0 10px 0; color: #666; font-size: 0.9em; flex-grow: 1; }
         .list-meta { font-size: 0.8em; color: #888; }
         .list-meta a { color: #0056b3; text-decoration: none; font-weight: bold; }
         .list-meta a:hover { text-decoration: underline; }
-        .list-actions { margin-top: 10px; }
+        .list-actions { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
         .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; margin-right: 10px; }
         .btn-edit { background: #007bff; color: white; }
         .btn-delete { background: #dc3545; color: white; }
-        .empty-state { text-align: center; padding: 50px; }
+        .empty-state { text-align: center; padding: 50px; grid-column: 1 / -1; }
         
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; }
         .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); text-align: center; }
@@ -109,6 +116,9 @@
 
         <div class="lists-header">
             <h1 class="section-title">Public Lists</h1>
+            <div class="search-bar">
+                <input type="text" id="listSearchInput" placeholder="Search public lists...">
+            </div>
             <a href="create-list.html" class="btn-create">Create a List</a>
         </div>
         <div id="listsContainer">
@@ -141,6 +151,7 @@
         const auth = firebase.auth();
 
         let currentUser = null;
+        let publicLists = []; // Store all public lists to enable client-side search
 
         document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(user => {
@@ -152,6 +163,7 @@
                 loadPageData();
             });
             document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
+            document.getElementById('listSearchInput').addEventListener('input', () => renderPublicLists());
         });
 
         async function handleAuthButtonClick() {
@@ -216,55 +228,72 @@
         }
 
         async function loadPublicLists() {
-            const container = document.getElementById('listsContainer');
             try {
                 const listsSnapshot = await db.collection('lists').where('isPublic', '==', true).orderBy('createdAt', 'desc').get();
-                if (listsSnapshot.empty) {
-                    container.innerHTML = '<div class="empty-state"><h3>No public lists yet.</h3><p>Why not create the first one?</p></div>';
-                    return;
-                }
-
+                
                 const allMediaSnapshot = await db.collection('movies').get();
                 const allMedia = {};
                 allMediaSnapshot.forEach(doc => {
                     allMedia[doc.id] = doc.data();
                 });
 
-                let listsHTML = '';
-                listsSnapshot.forEach(doc => {
-                    const list = doc.data();
-                    const listId = doc.id;
-                    const postersHTML = (list.mediaIds || []).slice(0, 5).map(mediaId => {
-                        const media = allMedia[mediaId];
-                        return media && media.posterUrl ? `<img src="${media.posterUrl}" alt="">` : '';
-                    }).join('');
-                    
-                    const isOwner = currentUser && currentUser.uid === list.creatorId;
-                    const actionsHTML = isOwner ? `
-                        <div class="list-actions">
-                            <a href="edit-list.html?id=${listId}" class="btn-small btn-edit">Edit</a>
-                            <button class="btn-small btn-delete" onclick="deleteList('${listId}')">Delete</button>
-                        </div>
-                    ` : '';
-
-                    listsHTML += `
-                        <div class="list-card">
-                            <div class="list-posters">${postersHTML}</div>
-                            <div class="list-info">
-                                <h3><a href="edit-list.html?id=${listId}">${list.listName}</a></h3>
-                                <p class="list-meta">Created by <a href="profile.html?id=${list.creatorId}">${list.creatorDisplayName || 'Anonymous'}</a></p>
-                                <p>${list.description || ''}</p>
-                                ${actionsHTML}
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = listsHTML;
+                publicLists = listsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    media: (doc.data().mediaIds || []).map(id => allMedia[id]).filter(Boolean)
+                }));
+                
+                renderPublicLists();
 
             } catch (error) {
                 console.error("Error loading public lists:", error);
-                container.innerHTML = '<div class="empty-state"><h3>Could not load lists. Please try again later.</h3></div>';
+                document.getElementById('listsContainer').innerHTML = '<div class="empty-state"><h3>Could not load lists. Please try again later.</h3></div>';
             }
+        }
+        
+        function renderPublicLists() {
+            const container = document.getElementById('listsContainer');
+            const searchTerm = document.getElementById('listSearchInput').value.toLowerCase();
+
+            const filteredLists = searchTerm 
+                ? publicLists.filter(list => list.listName.toLowerCase().includes(searchTerm))
+                : publicLists;
+
+            if (filteredLists.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3>No public lists found.</h3></div>';
+                return;
+            }
+
+            container.innerHTML = filteredLists.map(list => {
+                const firstItem = list.media[0];
+                const posterUrl = firstItem ? firstItem.posterUrl : 'https://placehold.co/300x450?text=Empty+List';
+                
+                let description = list.description || '';
+                const words = description.split(' ');
+                if (words.length > 10) {
+                    description = words.slice(0, 10).join(' ') + '...';
+                }
+
+                const isOwner = currentUser && currentUser.uid === list.creatorId;
+                const actionsHTML = isOwner ? `
+                    <div class="list-actions">
+                        <a href="edit-list.html?id=${list.id}" class="btn-small btn-edit">Edit</a>
+                        <button class="btn-small btn-delete" onclick="deleteList('${list.id}')">Delete</button>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="list-card-grid">
+                        <img src="${posterUrl}" alt="${list.listName}" class="list-poster-single">
+                        <div class="list-info">
+                            <h3><a href="edit-list.html?id=${list.id}">${list.listName}</a></h3>
+                            <p class="list-meta">Created by <a href="profile.html?id=${list.creatorId}">${list.creatorDisplayName || 'Anonymous'}</a></p>
+                            <p>${description}</p>
+                            ${actionsHTML}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
         
         function showConfirmationModal(title, message, onConfirm) {
