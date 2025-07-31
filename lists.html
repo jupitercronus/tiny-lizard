@@ -23,10 +23,13 @@
         .auth-btn:hover { background: #c82333; }
         .main-container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
         .lists-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
-        .section-title { font-size: 2em; color: #333; }
+        .section-title { font-size: 2em; color: #333; margin: 0; }
+        .header-controls { display: flex; gap: 10px; align-items: center; }
         .btn-create { background: #28a745; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; }
-        .search-bar { flex-grow: 1; max-width: 400px; }
+        .search-bar { flex-grow: 1; max-width: 300px; }
         .search-bar input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; }
+        .filter-buttons button { padding: 10px 15px; border: 1px solid #ccc; background: white; border-radius: 5px; cursor: pointer; }
+        .filter-buttons button.active { background: #007bff; color: white; border-color: #007bff; }
         
         .activity-section { margin-bottom: 40px; }
         .activity-grid { 
@@ -40,7 +43,6 @@
         .activity-item a { color: #0056b3; text-decoration: none; font-weight: bold; }
         .activity-item a:hover { text-decoration: underline; }
 
-        /* NEW: Public Lists Grid Styles */
         #listsContainer {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -101,6 +103,24 @@
     </nav>
 
     <div class="main-container">
+        <div class="lists-header">
+            <h1 class="section-title">Public Lists</h1>
+            <div class="header-controls">
+                <a href="create-list.html" class="btn-create">Create a List</a>
+                <div class="search-bar">
+                    <input type="text" id="listSearchInput" placeholder="Search lists...">
+                </div>
+                <div class="filter-buttons">
+                    <button id="allListsBtn" class="active">All Lists</button>
+                    <button id="myListsBtn">My Lists</button>
+                </div>
+            </div>
+        </div>
+        <div id="listsContainer">
+            <div class="empty-state"><h2>Loading lists...</h2></div>
+        </div>
+
+        <hr style="margin: 40px 0;">
 
         <div class="activity-section">
             <h2 class="section-title" style="text-align: left; font-size: 1.5em; margin-bottom: 15px;">Recently Watched</h2>
@@ -108,21 +128,8 @@
         </div>
         
         <div class="activity-section">
-            <h2 class="section-title" style="text-align: left; font-size: 1.5em; margin-bottom: 15px;">Recently Acquired</h2>
+            <h2 class="section-title" style="text-align: left; font-size: 1.5em; margin-bottom: 15px;">Recently Purchased</h2>
             <div id="recentlyBoughtContainer" class="activity-grid"></div>
-        </div>
-
-        <hr style="margin: 40px 0;">
-
-        <div class="lists-header">
-            <h1 class="section-title">Public Lists</h1>
-            <div class="search-bar">
-                <input type="text" id="listSearchInput" placeholder="Search public lists...">
-            </div>
-            <a href="create-list.html" class="btn-create">Create a List</a>
-        </div>
-        <div id="listsContainer">
-            <div class="empty-state"><h2>Loading lists...</h2></div>
         </div>
     </div>
     
@@ -151,7 +158,8 @@
         const auth = firebase.auth();
 
         let currentUser = null;
-        let publicLists = []; // Store all public lists to enable client-side search
+        let allLists = [];
+        let currentListView = 'all';
 
         document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(user => {
@@ -159,16 +167,28 @@
                 document.getElementById('authBtn').textContent = user ? 'Logout' : 'Login';
                 if (!user) {
                     document.querySelector('.btn-create').href = 'auth.html';
+                    document.getElementById('myListsBtn').style.display = 'none';
+                } else {
+                    document.getElementById('myListsBtn').style.display = 'inline-block';
                 }
                 loadPageData();
             });
             document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
             document.getElementById('listSearchInput').addEventListener('input', () => renderPublicLists());
+            document.getElementById('allListsBtn').addEventListener('click', () => setListView('all'));
+            document.getElementById('myListsBtn').addEventListener('click', () => setListView('my'));
         });
 
         async function handleAuthButtonClick() {
             if (currentUser) await auth.signOut();
             else window.location.href = 'auth.html';
+        }
+        
+        function setListView(view) {
+            currentListView = view;
+            document.getElementById('allListsBtn').classList.toggle('active', view === 'all');
+            document.getElementById('myListsBtn').classList.toggle('active', view === 'my');
+            renderPublicLists();
         }
 
         function loadPageData() {
@@ -207,28 +227,42 @@
             try {
                 const snapshot = await db.collection('purchaseHistory').orderBy('timestamp', 'desc').limit(10).get();
                 if (snapshot.empty) {
-                    container.innerHTML = "<p>No new acquisitions yet.</p>";
+                    container.innerHTML = "<p>No new purchases yet.</p>";
                     return;
                 }
+
+                const mediaIds = [...new Set(snapshot.docs.map(doc => doc.data().mediaId))];
+                const mediaData = {};
+                if (mediaIds.length > 0) {
+                    const mediaSnapshot = await db.collection('movies').where(firebase.firestore.FieldPath.documentId(), 'in', mediaIds).get();
+                    mediaSnapshot.forEach(doc => {
+                        mediaData[doc.id] = doc.data();
+                    });
+                }
+
                 container.innerHTML = snapshot.docs.map(doc => {
                     const item = doc.data();
+                    const media = mediaData[item.mediaId];
+                    const titleWithYear = media ? `${media.title} (${media.year})` : item.mediaTitle;
                     return `
                         <div class="activity-item">
                             <a href="library.html?id=${item.mediaId}">
                                 <img src="${item.posterUrl || 'https://placehold.co/200x300?text=No+Poster'}" alt="${item.mediaTitle}">
                             </a>
-                            <p><a href="profile.html?id=${item.userId}">${item.userDisplayName}</a> acquired</p>
+                             <a href="library.html?id=${item.mediaId}" style="font-weight: normal;">${titleWithYear}</a>
+                            <p>by <a href="profile.html?id=${item.userId}">${item.userDisplayName}</a></p>
                         </div>
                     `;
                 }).join('');
             } catch (error) {
-                console.error("Error loading recently bought:", error);
+                console.error("Error loading recently purchased:", error);
                 container.innerHTML = "<p>Could not load activity.</p>";
             }
         }
 
         async function loadPublicLists() {
             try {
+                // FIX: This query now correctly fetches only public lists from the database
                 const listsSnapshot = await db.collection('lists').where('isPublic', '==', true).orderBy('createdAt', 'desc').get();
                 
                 const allMediaSnapshot = await db.collection('movies').get();
@@ -237,7 +271,7 @@
                     allMedia[doc.id] = doc.data();
                 });
 
-                publicLists = listsSnapshot.docs.map(doc => ({
+                allLists = listsSnapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data(),
                     media: (doc.data().mediaIds || []).map(id => allMedia[id]).filter(Boolean)
@@ -246,8 +280,8 @@
                 renderPublicLists();
 
             } catch (error) {
-                console.error("Error loading public lists:", error);
-                document.getElementById('listsContainer').innerHTML = '<div class="empty-state"><h3>Could not load lists. Please try again later.</h3></div>';
+                console.error("Error loading lists:", error);
+                document.getElementById('listsContainer').innerHTML = '<div class="empty-state"><h3>Could not load lists. Please check your Firestore indexes and try again.</h3></div>';
             }
         }
         
@@ -255,16 +289,24 @@
             const container = document.getElementById('listsContainer');
             const searchTerm = document.getElementById('listSearchInput').value.toLowerCase();
 
-            const filteredLists = searchTerm 
-                ? publicLists.filter(list => list.listName.toLowerCase().includes(searchTerm))
-                : publicLists;
+            let listsToDisplay = allLists;
+            
+            if(currentListView === 'my') {
+                if(!currentUser) return;
+                listsToDisplay = allLists.filter(list => list.creatorId === currentUser.uid);
+            }
+            // No need for an else, since we now fetch only public lists by default
 
-            if (filteredLists.length === 0) {
-                container.innerHTML = '<div class="empty-state"><h3>No public lists found.</h3></div>';
+            if (searchTerm) {
+                listsToDisplay = listsToDisplay.filter(list => list.listName.toLowerCase().includes(searchTerm));
+            }
+
+            if (listsToDisplay.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3>No lists found.</h3></div>';
                 return;
             }
 
-            container.innerHTML = filteredLists.map(list => {
+            container.innerHTML = listsToDisplay.map(list => {
                 const firstItem = list.media[0];
                 const posterUrl = firstItem ? firstItem.posterUrl : 'https://placehold.co/300x450?text=Empty+List';
                 
@@ -314,7 +356,7 @@
                 if (confirmed) {
                     try {
                         await db.collection('lists').doc(listId).delete();
-                        loadPublicLists(); // Refresh the list view
+                        loadPublicLists();
                     } catch (error) {
                         console.error("Error deleting list:", error);
                         alert("Could not delete list.");

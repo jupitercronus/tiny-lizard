@@ -8,6 +8,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <!-- ZXing Barcode Scanner Library -->
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -158,6 +160,7 @@
             gap: 15px;
             align-items: flex-start;
             transition: background-color 0.3s ease;
+            position: relative;
         }
         .search-result:hover { background: #e3f2fd; }
         .search-result-poster { width: 60px; height: 90px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
@@ -166,7 +169,15 @@
         .search-result h4 { margin: 0 0 5px 0; color: #333; }
         .search-result p { margin: 0; color: #666; font-size: 14px; }
         
-        /* NEW: Simplified Half-Star Rating Styles */
+        .relevance-score {
+            font-size: 0.6em;
+            background: #28a745;
+            color: white;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-left: 4px;
+        }
+        
         .star-rating { 
             display: inline-flex; 
             gap: 2px;
@@ -202,15 +213,26 @@
         .scanner-overlay { position: relative; display: inline-block; }
         @keyframes scan { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
 
-        /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; }
-        .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border: 1px solid #888; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19); text-align: center; }
+        .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); text-align: center; }
         .modal-content h3 { margin-top: 0; color: #333; }
         .modal-content p { margin-bottom: 20px; color: #666; }
         .modal-buttons { display: flex; justify-content: center; gap: 15px; }
         .modal-btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s ease; }
         .modal-btn.ok { background: #007bff; color: white; }
         .modal-btn.ok:hover { background: #0056b3; }
+
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -233,11 +255,30 @@
         <div class="search-section">
             <h3>🔍 Search for Media</h3>
             <div class="search-controls">
-                <input type="text" id="movieSearch" placeholder="Type movie title to search...">
+                <input type="text" id="movieSearch" placeholder="Type title, actor, director...">
                 <button type="button" id="searchBtn" class="btn">Search</button>
                 <button type="button" id="cameraBtn" class="btn">Scan Barcode</button>
                 <button type="button" id="manualBarcodeBtn" class="btn">Enter Barcode</button>
             </div>
+            
+            <div id="manualBarcodeInput" style="display: none; margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="barcodeInput" placeholder="Enter 8-18 digit barcode" pattern="[0-9]{8,18}" maxlength="18">
+                    <button type="button" id="lookupBarcodeBtn" class="btn">Lookup</button>
+                    <button type="button" id="cancelBarcodeBtn" class="btn" style="background: #6c757d;">Cancel</button>
+                    <div class="loading-spinner" id="barcodeSpinner"></div>
+                </div>
+                <small style="color: #666; display: block; margin-top: 5px;">UPC/EAN barcodes are typically 12-13 digits</small>
+            </div>
+            
+            <div class="scanner-container" id="scannerContainer" style="display: none;">
+                <div class="scanner-overlay">
+                    <video id="video" autoplay muted style="width: 100%; max-width: 400px; height: 300px; border: 2px solid #007bff; border-radius: 5px; background: #000;"></video>
+                </div>
+                <p style="margin: 10px 0; color: #666;">Position barcode in camera view</p>
+                <button type="button" id="stopScanBtn" class="btn">Stop Camera</button>
+            </div>
+            
             <div id="statusMessage"></div>
             <div id="searchResults"></div>
         </div>
@@ -316,7 +357,6 @@
                 </div>
             </div>
 
-            <!-- Physical Copy Section -->
             <div class="form-group">
                 <label for="ownedCheckbox">I own a physical copy</label>
                 <input type="checkbox" id="ownedCheckbox" style="width: auto; margin-top: 8px;">
@@ -340,13 +380,15 @@
         </div>
     </div>
 
-    <script type="text/javascript" src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
-
     <script>
         let currentRating = 0;
         let editingMovieId = null; 
         let currentUser = null; 
         let isPublicFieldsEditable = true;
+        let codeReader = null;
+        let videoInputDevices = [];
+        let creditCache = new Map();
+        let creditLookupTimeout;
         
         const TMDB_BASE_URL = '/api/tmdb';
         const UPC_BASE_URL = '/api/upc';
@@ -380,11 +422,8 @@
         });
 
         async function handleAuthButtonClick() {
-            if (currentUser) {
-                await auth.signOut();
-            } else {
-                window.location.href = 'auth.html';
-            }
+            if (currentUser) await auth.signOut();
+            else window.location.href = 'auth.html';
         }
 
         function initializePage() {
@@ -630,54 +669,148 @@
             document.getElementById('searchBtn').addEventListener('click', () => performSearch(searchInput.value.trim()));
         }
 
+        // HYBRID SMART SEARCH IMPLEMENTATION (Option 2)
+        function containsPersonName(query) {
+            const namePatterns = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/;
+            return namePatterns.test(query);
+        }
+
+        function calculateRelevanceScore(item, query) {
+            const keywords = query.toLowerCase().split(' ').filter(k => k.length > 2);
+            const title = (item.title || item.name || '').toLowerCase();
+            const overview = (item.overview || '').toLowerCase();
+            let score = 0;
+
+            keywords.forEach(keyword => {
+                if (title === keyword) score += 100;
+                if (title.startsWith(keyword)) score += 50;
+                if (title.includes(keyword)) score += 20;
+                if (overview.includes(keyword)) score += 5;
+                
+                const titleWords = title.split(' ');
+                titleWords.forEach(word => {
+                    if (word.startsWith(keyword) || keyword.startsWith(word)) {
+                        score += 10;
+                    }
+                });
+            });
+
+            const releaseYear = parseInt((item.release_date || item.first_air_date || '').substring(0, 4));
+            if (releaseYear > 2020) score += 5;
+            if (releaseYear > 2015) score += 3;
+
+            score += Math.min(item.popularity / 10, 20);
+            score += (item.vote_average || 0) * 2;
+
+            return score;
+        }
+
         async function performSearch(query) {
             if (!query) return;
             showStatusMessage('Searching...', 'info');
+            
             try {
-                const movieSearchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}`;
-                const tvSearchUrl = `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(query)}`;
+                const searchUrl = `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}`;
+                const response = await fetch(searchUrl);
+                const data = await response.json();
 
-                const [movieResponse, tvResponse] = await Promise.all([
-                    fetch(movieSearchUrl),
-                    fetch(tvSearchUrl)
-                ]);
+                const results = data.results
+                    .filter(item => item.media_type === 'movie' || item.media_type === 'tv')
+                    .map(item => ({
+                        ...item,
+                        score: calculateRelevanceScore(item, query),
+                        needsCreditBoost: containsPersonName(query)
+                    }))
+                    .sort((a, b) => b.score - a.score);
 
-                const movieData = await movieResponse.json();
-                const tvData = await tvResponse.json();
-
-                const combinedResults = [
-                    ...movieData.results.map(item => ({...item, media_type: 'movie'})),
-                    ...tvData.results.map(item => ({...item, media_type: 'tv'}))
-                ].sort((a, b) => b.popularity - a.popularity);
-
-                displayResults(combinedResults);
-                showStatusMessage(`${combinedResults.length} results found.`, 'success');
+                displayResultsWithCreditLookup(results, query);
+                showStatusMessage(`${results.length} results found.`, 'success');
             } catch (error) {
                 console.error("Search error:", error);
                 showStatusMessage('Search failed.', 'error');
             }
         }
 
-        function displayResults(results) {
+        function displayResultsWithCreditLookup(results, originalQuery) {
             const resultsDiv = document.getElementById('searchResults');
             if (results.length === 0) {
                 resultsDiv.innerHTML = '<p>No results found.</p>';
                 return;
             }
-            resultsDiv.innerHTML = results.slice(0, 10).map(item => {
+
+            resultsDiv.innerHTML = results.slice(0, 10).map((item, index) => {
                 const title = item.title || item.name;
                 const year = (item.release_date || item.first_air_date || '').substring(0, 4);
                 const type = item.media_type === 'tv' ? 'TV Show' : 'Movie';
+                
                 return `
-                    <div class="search-result" onclick="selectMedia('${item.id}', '${item.media_type}')">
-                        <img src="${item.poster_path ? TMDB_IMAGE_BASE + item.poster_path : ''}" class="search-result-poster" onerror="this.style.display='none'">
+                    <div class="search-result" 
+                         onclick="selectMedia('${item.id}', '${item.media_type}')"
+                         onmouseenter="boostScoreWithCredits(this, '${item.id}', '${item.media_type}', '${originalQuery}', ${index})"
+                         data-original-score="${item.score}">
+                        <img src="${item.poster_path ? TMDB_IMAGE_BASE + item.poster_path : ''}" 
+                             class="search-result-poster" onerror="this.style.display='none'">
                         <div class="search-result-info">
-                            <h4>${title} (${year}) <span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px;">${type}</span></h4>
+                            <h4>${title} (${year}) 
+                                <span style="font-size:0.7em; background:#007bff; color:white; padding: 2px 6px; border-radius: 4px;">${type}</span>
+                                <span class="relevance-score">
+                                    ${Math.round(item.score)}
+                                </span>
+                            </h4>
                             <p>${(item.overview || '').substring(0, 100)}...</p>
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        async function boostScoreWithCredits(element, id, mediaType, originalQuery, index) {
+            clearTimeout(creditLookupTimeout);
+            
+            const cacheKey = `${mediaType}-${id}`;
+            if (creditCache.has(cacheKey)) {
+                updateScoreDisplay(element, creditCache.get(cacheKey), originalQuery);
+                return;
+            }
+
+            creditLookupTimeout = setTimeout(async () => {
+                try {
+                    const creditUrl = `${TMDB_BASE_URL}/${mediaType}/${id}?append_to_response=credits`;
+                    const response = await fetch(creditUrl);
+                    const data = await response.json();
+                    
+                    creditCache.set(cacheKey, data.credits);
+                    updateScoreDisplay(element, data.credits, originalQuery);
+                } catch (error) {
+                    console.error('Credit lookup error:', error);
+                }
+            }, 300);
+        }
+
+        function updateScoreDisplay(element, credits, originalQuery) {
+            const keywords = originalQuery.toLowerCase().split(' ').filter(k => k.length > 2);
+            const originalScore = parseFloat(element.dataset.originalScore);
+            let creditBoost = 0;
+
+            if (credits) {
+                const cast = (credits.cast || []).map(c => c.name.toLowerCase());
+                const director = (credits.crew.find(c => c.job === 'Director')?.name || '').toLowerCase();
+                
+                keywords.forEach(keyword => {
+                    if (director.includes(keyword)) creditBoost += 25;
+                    if (cast.some(actor => actor.includes(keyword))) creditBoost += 15;
+                });
+            }
+
+            const newScore = originalScore + creditBoost;
+            const scoreElement = element.querySelector('.relevance-score');
+            if (scoreElement) {
+                scoreElement.textContent = Math.round(newScore);
+                if (creditBoost > 0) {
+                    scoreElement.style.background = '#dc3545';
+                    element.style.order = -newScore;
+                }
+            }
         }
 
         async function selectMedia(id, type) {
@@ -702,6 +835,7 @@
 
                 togglePublicFieldsReadonly(true);
                 isPublicFieldsEditable = false;
+                showStatusMessage('Media details loaded successfully!', 'success');
             } catch (error) {
                 console.error("Error selecting media:", error);
                 showStatusMessage('Could not load details.', 'error');
@@ -765,6 +899,7 @@
                 }
              });
         }
+
         function showAlertModal(title, message, onOk = () => {}) { 
             const modal = document.getElementById('alertModal');
             document.getElementById('alertModalTitle').textContent = title;
@@ -775,49 +910,226 @@
                 onOk();
             };
         }
+
         function showStatusMessage(message, type) {
             const statusDiv = document.getElementById('statusMessage');
             statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
         }
         
-        function setupBarcodeScanner() {
-            console.log("Barcode scanner setup complete.");
+        // COMPLETE BARCODE SCANNER IMPLEMENTATION WITH PROPER EVENT LISTENERS
+        async function setupBarcodeScanner() {
+            const cameraBtn = document.getElementById('cameraBtn');
+            const manualBtn = document.getElementById('manualBarcodeBtn');
+            const lookupBtn = document.getElementById('lookupBarcodeBtn');
+            const cancelBtn = document.getElementById('cancelBarcodeBtn');
+            const stopBtn = document.getElementById('stopScanBtn');
+            const barcodeInput = document.getElementById('barcodeInput');
+            
+            // Set up manual barcode entry listeners
+            manualBtn.addEventListener('click', showManualInput);
+            lookupBtn.addEventListener('click', lookupManualBarcode);
+            cancelBtn.addEventListener('click', hideManualInput);
+            stopBtn.addEventListener('click', stopScanner);
+            
+            // Allow Enter key in manual input
+            barcodeInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    lookupManualBarcode();
+                }
+            });
+
+            // Input validation on typing
+            barcodeInput.addEventListener('input', function(e) {
+                const value = e.target.value;
+                const isValid = /^\d{0,18}$/.test(value);
+                if (!isValid) {
+                    e.target.value = value.replace(/\D/g, '').slice(0, 18);
+                }
+                
+                const lookupBtn = document.getElementById('lookupBarcodeBtn');
+                lookupBtn.disabled = e.target.value.length < 8;
+            });
+
+            // Set up camera scanning
+            cameraBtn.addEventListener('click', startScanner);
+
+            try {
+                if (typeof ZXing !== 'undefined' && ZXing.BrowserMultiFormatReader) {
+                    codeReader = new ZXing.BrowserMultiFormatReader();
+                    
+                    try {
+                        videoInputDevices = await codeReader.listVideoInputDevices();
+                        if (videoInputDevices.length === 0) {
+                            cameraBtn.disabled = true;
+                            cameraBtn.textContent = 'No Camera';
+                            console.log('No video input devices found');
+                        } else {
+                            console.log(`Found ${videoInputDevices.length} video input devices`);
+                        }
+                    } catch (deviceError) {
+                        console.error('Error listing video devices:', deviceError);
+                        cameraBtn.disabled = true;
+                        cameraBtn.textContent = 'Camera Access Denied';
+                    }
+                } else {
+                    console.error('ZXing library not loaded properly');
+                    cameraBtn.disabled = true;
+                    cameraBtn.textContent = 'Scanner N/A';
+                }
+            } catch (err) {
+                console.error("Error setting up barcode scanner:", err);
+                cameraBtn.disabled = true;
+                cameraBtn.textContent = 'Scanner Error';
+            }
         }
+
+        function showManualInput() {
+            const manualDiv = document.getElementById('manualBarcodeInput');
+            const barcodeInput = document.getElementById('barcodeInput');
+            const lookupBtn = document.getElementById('lookupBarcodeBtn');
+            
+            manualDiv.style.display = 'block';
+            barcodeInput.value = '';
+            barcodeInput.focus();
+            lookupBtn.disabled = true;
+        }
+
+        function hideManualInput() {
+            const manualDiv = document.getElementById('manualBarcodeInput');
+            const barcodeInput = document.getElementById('barcodeInput');
+            const spinner = document.getElementById('barcodeSpinner');
+            
+            manualDiv.style.display = 'none';
+            barcodeInput.value = '';
+            spinner.style.display = 'none';
+        }
+
+        function lookupManualBarcode() {
+            const barcode = document.getElementById('barcodeInput').value.trim();
+            const spinner = document.getElementById('barcodeSpinner');
+            
+            if (!barcode) {
+                showStatusMessage('Please enter a barcode number.', 'error');
+                return;
+            }
+            
+            if (!/^\d{8,18}$/.test(barcode)) {
+                showStatusMessage('Please enter a valid barcode (8-18 digits).', 'error');
+                return;
+            }
+            
+            spinner.style.display = 'block';
+            lookupMovieByBarcode(barcode).finally(() => {
+                hideManualInput();
+            });
+        }
+
+        async function startScanner() {
+            if (!codeReader || videoInputDevices.length === 0) {
+                showStatusMessage('Camera not available.', 'error');
+                return;
+            }
+
+            const scannerContainer = document.getElementById('scannerContainer');
+            const videoElement = document.getElementById('video');
+            
+            try {
+                scannerContainer.style.display = 'block';
+                showStatusMessage('Starting camera...', 'info');
+                
+                const selectedDeviceId = videoInputDevices[0].deviceId;
+                
+                await codeReader.decodeFromVideoDevice(selectedDeviceId, 'video', (result, err) => {
+                    if (result) {
+                        console.log('Barcode detected:', result.text);
+                        showStatusMessage(`Barcode detected: ${result.text}`, 'success');
+                        stopScanner();
+                        lookupMovieByBarcode(result.text);
+                    }
+                    if (err && !(err instanceof ZXing.NotFoundException)) {
+                        console.error('Scanner error:', err);
+                    }
+                });
+                
+                showStatusMessage('Camera ready. Position barcode in view.', 'info');
+                
+            } catch (error) {
+                console.error('Error starting scanner:', error);
+                if (error.name === 'NotAllowedError') {
+                    showStatusMessage('Camera access denied. Please allow camera permissions.', 'error');
+                } else if (error.name === 'NotFoundError') {
+                    showStatusMessage('No camera found on this device.', 'error');
+                } else {
+                    showStatusMessage('Failed to start camera: ' + error.message, 'error');
+                }
+                stopScanner();
+            }
+        }
+
+        function stopScanner() {
+            if (codeReader) {
+                codeReader.reset();
+            }
+            document.getElementById('scannerContainer').style.display = 'none';
+            showStatusMessage('Camera stopped.', 'info');
+        }
+
         async function lookupMovieByBarcode(barcode) {
             showStatusMessage(`Looking up barcode: ${barcode}...`, 'info');
             try {
                 const upcResponse = await fetch(`${UPC_BASE_URL}?upc=${barcode}`);
-                if (!upcResponse.ok) throw new Error(`UPC lookup failed: ${upcResponse.statusText}`);
+                
+                if (!upcResponse.ok) {
+                    throw new Error(`UPC lookup failed: ${upcResponse.status} ${upcResponse.statusText}`);
+                }
+                
                 const upcData = await upcResponse.json();
 
                 if (!upcData.items || upcData.items.length === 0) {
-                    showAlertModal('Barcode Not Found', `No product found for barcode: ${barcode}.`);
+                    showStatusMessage('No product found for this barcode.', 'error');
+                    showAlertModal('Barcode Not Found', `No product found for barcode: ${barcode}. You can try entering the movie details manually.`);
                     return;
                 }
                 
                 const product = upcData.items[0];
-                const productName = product.title || 'Unknown Product';
+                const productName = product.title || product.description || 'Unknown Product';
                 
                 document.getElementById('editionDetailsInput').value = productName;
-                document.getElementById('editionDetails').value = productName;
+                if (document.getElementById('editionDetails')) {
+                    document.getElementById('editionDetails').value = productName;
+                }
                 
-                showStatusMessage(`Found: ${productName}. Searching TMDb...`, 'info');
+                showStatusMessage(`Found: ${productName}. Searching for movie details...`, 'info');
                 
                 const movieTitle = extractMovieTitle(productName);
-                await performSearch(movieTitle);
+                if (movieTitle) {
+                    await performSearch(movieTitle);
+                } else {
+                    showStatusMessage('Could not extract movie title from product name.', 'error');
+                }
 
             } catch (error) {
                 console.error('Barcode lookup error:', error);
-                showAlertModal('Lookup Error', `An error occurred: ${error.message}.`);
+                showStatusMessage('Barcode lookup failed.', 'error');
+                showAlertModal('Lookup Error', `Failed to lookup barcode: ${error.message}`);
             }
         }
+
         function extractMovieTitle(productName) {
             let title = productName;
-            title = title.replace(/\b(DVD|Blu-ray|4K|UHD|Digital|Copy|Widescreen|Full Screen)\b/gi, '');
+            title = title.replace(/\b(DVD|Blu-ray|4K|UHD|Digital|Copy|Widescreen|Full Screen|Special Edition|Collector's Edition)\b/gi, '');
             title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); 
             title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim();
+            title = title.replace(/\s+/g, ' ').trim();
             return title.trim() || productName;
         }
+
+        // Cache management
+        function clearCreditCache() {
+            creditCache.clear();
+        }
+
     </script>
 </body>
-</html>
+</html> 
