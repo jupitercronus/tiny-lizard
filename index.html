@@ -27,6 +27,7 @@
         .controls-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px; }
         .search-bar { position: relative; flex: 1; max-width: 400px; }
         .search-bar input { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; }
+        .filter-controls { display: flex; gap: 10px; }
         .filter-dropdown { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; background-color: white; font-size: 16px; cursor: pointer; }
         .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
         .media-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #ddd; transition: transform 0.3s ease, box-shadow 0.3s ease; display: flex; flex-direction: column; }
@@ -38,10 +39,10 @@
         .media-title { font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 8px; cursor: pointer; }
         .media-year { color: #666; font-size: 0.9em; margin-bottom: 12px; }
         
-        /* Styles for user-specific details on cards */
-        .media-rating { display: flex; gap: 3px; margin-bottom: 12px; }
-        .star { color: #ffc107; font-size: 1.1em; }
-        .star.empty { color: #ddd; }
+        .media-rating { display: flex; margin-bottom: 12px; }
+        .star-display { display: inline-block; position: relative; font-size: 1.2em; color: #ddd; }
+        .star-display-filled { position: absolute; top: 0; left: 0; white-space: nowrap; overflow: hidden; color: #ffc107; }
+
         .media-status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; margin-bottom: 12px; }
         .watched { background: #d4edda; color: #155724; }
         .unwatched { background: #f8d7da; color: #721c24; }
@@ -63,9 +64,12 @@
         .btn-small.btn-add { background: #28a745; color: white; }
         .btn-small.btn-add:hover { background: #218838; }
 
+        .media-added-by { font-size: 0.8em; color: #888; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        .media-added-by a { color: #0056b3; text-decoration: none; font-weight: bold; }
+        .media-added-by a:hover { text-decoration: underline; }
+
         .empty-state { text-align: center; padding: 80px 20px; color: #666; }
         
-        /* Modal Styles for confirmation */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; }
         .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border: 1px solid #888; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19); text-align: center; }
         .modal-buttons { display: flex; justify-content: center; gap: 15px; }
@@ -98,10 +102,19 @@
             <div class="search-bar">
                 <input type="text" id="searchInput" placeholder="Search the library...">
             </div>
-            <select id="filterSortDropdown" class="filter-dropdown">
-                 <option value="all">All Media</option>
-                <option value="my">My Media</option>
-            </select>
+            <div class="filter-controls">
+                <select id="viewDropdown" class="filter-dropdown">
+                    <option value="all">All Media</option>
+                    <option value="my">My Media</option>
+                </select>
+                <select id="sortDropdown" class="filter-dropdown">
+                    <option value="dateAdded">Recently Added</option>
+                    <option value="titleAsc">Title (A-Z)</option>
+                    <option value="titleDesc">Title (Z-A)</option>
+                    <option value="ratingDesc">My Rating (High to Low)</option>
+                    <option value="ratingAsc">My Rating (Low to High)</option>
+                </select>
+            </div>
         </div>
 
         <div id="mediaContainer" class="media-grid">
@@ -124,7 +137,6 @@
 
 
     <script>
-        // --- Firebase Initialization ---
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
           authDomain: "tiny-lizard.firebaseapp.com",
@@ -136,7 +148,6 @@
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore(); 
         const auth = firebase.auth();
-        // --- End Firebase Initialization ---
 
         let currentUser = null;
         let allMedia = [];
@@ -145,35 +156,30 @@
         document.addEventListener('DOMContentLoaded', () => {
             auth.onAuthStateChanged(user => {
                 currentUser = user;
-                const authBtn = document.getElementById('authBtn');
-                authBtn.textContent = user ? 'Logout' : 'Login';
+                document.getElementById('authBtn').textContent = user ? 'Logout' : 'Login';
                 loadAllMedia();
             });
 
             document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
             document.getElementById('searchInput').addEventListener('input', renderMedia);
-            document.getElementById('filterSortDropdown').addEventListener('change', renderMedia);
+            document.getElementById('viewDropdown').addEventListener('change', renderMedia);
+            document.getElementById('sortDropdown').addEventListener('change', renderMedia);
         });
         
         async function handleAuthButtonClick() {
-            if (currentUser) {
-                await auth.signOut();
-            } else {
-                window.location.href = 'auth.html';
-            }
+            if (currentUser) await auth.signOut();
+            else window.location.href = 'auth.html';
         }
 
         async function loadAllMedia() {
             try {
-                const mediaSnapshot = await db.collection('movies').orderBy('dateAdded', 'desc').get();
+                const mediaSnapshot = await db.collection('movies').get();
                 allMedia = mediaSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                myInteractions = {}; // Reset interactions
+                myInteractions = {};
                 if (currentUser) {
                     const interactionsSnapshot = await db.collection('users').doc(currentUser.uid).collection('movieInteractions').get();
-                    interactionsSnapshot.forEach(doc => {
-                        myInteractions[doc.id] = doc.data();
-                    });
+                    interactionsSnapshot.forEach(doc => { myInteractions[doc.id] = doc.data(); });
                 }
                 renderMedia();
             } catch (error) {
@@ -184,25 +190,37 @@
 
         function renderMedia() {
             const container = document.getElementById('mediaContainer');
-            const filter = document.getElementById('filterSortDropdown').value;
+            const view = document.getElementById('viewDropdown').value;
+            const sort = document.getElementById('sortDropdown').value;
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
 
-            let mediaToDisplay = allMedia;
+            let mediaToDisplay = [...allMedia];
 
-            if (filter === 'my') {
-                if (!currentUser) {
-                    container.innerHTML = '<div class="empty-state"><h3>Please log in to see your media.</h3></div>';
-                    return;
-                }
-                mediaToDisplay = allMedia.filter(media => myInteractions[media.id]);
+            if (view === 'my' && currentUser) {
+                mediaToDisplay = mediaToDisplay.filter(media => myInteractions[media.id]);
             }
 
             if (searchTerm) {
                 mediaToDisplay = mediaToDisplay.filter(media => (media.title || '').toLowerCase().includes(searchTerm));
             }
 
+            mediaToDisplay.sort((a, b) => {
+                const interactionA = myInteractions[a.id] || { rating: 0 };
+                const interactionB = myInteractions[b.id] || { rating: 0 };
+                switch (sort) {
+                    case 'titleAsc': return (a.title || '').localeCompare(b.title || '');
+                    case 'titleDesc': return (b.title || '').localeCompare(a.title || '');
+                    case 'ratingDesc': return (interactionB.rating || 0) - (interactionA.rating || 0);
+                    case 'ratingAsc': return (interactionA.rating || 0) - (interactionB.rating || 0);
+                    default:
+                        const timeA = a.dateAdded ? a.dateAdded.seconds : 0;
+                        const timeB = b.dateAdded ? b.dateAdded.seconds : 0;
+                        return timeB - timeA;
+                }
+            });
+
             if (mediaToDisplay.length === 0) {
-                container.innerHTML = '<div class="empty-state"><h3>No media found.</h3><p>Try adjusting your filters or add some media!</p></div>';
+                container.innerHTML = '<div class="empty-state"><h3>No media found.</h3></div>';
                 return;
             }
 
@@ -221,33 +239,37 @@
                 let userDetailsHTML = '';
                 let actionsHTML = '';
                 let typeBadge = media.contentType === 'tv' ? '<span class="type-badge">TV Show</span>' : '';
+                
+                let addedByHTML = `
+                    <div class="media-added-by">
+                        Added by: <a href="profile.html?id=${media.originalUploaderId}">${media.originalUploaderDisplayName || 'A user'}</a>
+                    </div>
+                `;
 
-
-                if (currentUser && interaction) {
-                    // Logged in, and it's in their collection
-                    userDetailsHTML = `
-                        ${interaction.rating > 0 ? `<div class="media-rating">${generateStarDisplay(interaction.rating)}</div>` : ''}
-                        <div class="media-status ${interaction.watched ? 'watched' : 'unwatched'}">
-                            ${interaction.watched ? '✓ Watched' : '○ Not Watched'}
-                        </div>
-                    `;
-                    actionsHTML = `
-                        <div class="media-actions">
-                            <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
-                            <button class="btn-small btn-edit" onclick="editMovie('${media.id}')">Edit</button>
-                            <button class="btn-small btn-delete" onclick="deleteMovie('${media.id}')">Remove</button>
-                        </div>
-                    `;
-                } else if (currentUser && !interaction) {
-                    // Logged in, but NOT in their collection
-                    actionsHTML = `
-                        <div class="media-actions">
-                             <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
-                             <button class="btn-small btn-add" onclick="addExistingMovieToMyCollection('${media.id}')">Add to My Media</button>
-                        </div>
-                    `;
+                if (currentUser) {
+                    if (interaction) {
+                        userDetailsHTML = `
+                            ${interaction.rating > 0 ? generateStarDisplay(interaction.rating) : ''}
+                            <div class="media-status ${interaction.watched ? 'watched' : 'unwatched'}">
+                                ${interaction.watched ? '✓ Watched' : '○ Not Watched'}
+                            </div>
+                        `;
+                        actionsHTML = `
+                            <div class="media-actions">
+                                <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
+                                <button class="btn-small btn-edit" onclick="editMovie('${media.id}')">Edit</button>
+                                <button class="btn-small btn-delete" onclick="deleteMovie('${media.id}')">Remove</button>
+                            </div>
+                        `;
+                    } else {
+                        actionsHTML = `
+                            <div class="media-actions">
+                                 <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
+                                 <button class="btn-small btn-add" onclick="addExistingMovieToMyCollection('${media.id}')">Add to My Media</button>
+                            </div>
+                        `;
+                    }
                 } else {
-                    // Logged out
                     actionsHTML = `
                         <div class="media-actions">
                             <a href="library.html?id=${media.id}" class="btn-details">View Details</a>
@@ -258,7 +280,7 @@
                 return `
                     <div class="media-card">
                         <div class="media-poster" onclick="viewMediaDetails('${media.id}')">
-                            ${media.posterUrl ? `<img src="${media.posterUrl}" alt="${title} poster" loading="lazy">` : '<div class="no-poster">No Poster</div>'}
+                            ${media.posterUrl ? `<img src="${media.posterUrl}" alt="${title}" loading="lazy">` : '<div class="no-poster">No Poster</div>'}
                         </div>
                         <div class="media-card-content">
                             <h3 class="media-title" onclick="viewMediaDetails('${media.id}')">
@@ -271,6 +293,7 @@
                             ${publicDetailsHTML}
                             ${userDetailsHTML}
                             ${actionsHTML}
+                            ${addedByHTML}
                         </div>
                     </div>
                 `;
@@ -278,24 +301,22 @@
         }
         
         function generateStarDisplay(rating) {
-            let stars = '';
-            for (let i = 1; i <= 5; i++) {
-                stars += `<span class="star ${i <= rating ? '' : 'empty'}">★</span>`;
-            }
-            return stars;
+            const totalStars = 5;
+            let starHTML = '★★★★★';
+            let filledWidth = (rating / totalStars) * 100;
+            return `
+                <div class="media-rating">
+                    <div class="star-display">
+                        ${starHTML}
+                        <div class="star-display-filled" style="width: ${filledWidth}%;">${starHTML}</div>
+                    </div>
+                </div>
+            `;
         }
 
-        function viewMediaDetails(mediaId) {
-            window.location.href = `library.html?id=${mediaId}`;
-        }
-        
-        function editMovie(mediaId) {
-            window.location.href = `add-movie.html?edit=${mediaId}`;
-        }
-
-        function addExistingMovieToMyCollection(mediaId) {
-            window.location.href = `add-movie.html?edit=${mediaId}`;
-        }
+        function viewMediaDetails(mediaId) { window.location.href = `library.html?id=${mediaId}`; }
+        function editMovie(mediaId) { window.location.href = `add-movie.html?edit=${mediaId}`; }
+        function addExistingMovieToMyCollection(mediaId) { window.location.href = `add-movie.html?edit=${mediaId}`; }
         
         function showConfirmationModal(title, message, onConfirm) {
             const modal = document.getElementById('confirmationModal');

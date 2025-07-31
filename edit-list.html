@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit List - the library sale</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
+        .navbar { background: #333; padding: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+        .logo { font-size: 1.8em; font-weight: bold; color: white; text-decoration: none; }
+        .nav-links { display: flex; gap: 30px; align-items: center; }
+        .nav-link { color: white; text-decoration: none; font-weight: 500; padding: 8px 16px; border-radius: 6px; }
+        .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; }
+        .auth-btn { background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; cursor: pointer; border: none; }
+        .main-container { max-width: 1000px; margin: 30px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        #listDetails { margin-bottom: 20px; }
+        #listName { font-size: 2em; margin: 0; }
+        #listDescription { color: #666; }
+        .add-media-section { margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+        .search-bar { display: flex; gap: 10px; }
+        .search-bar input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .search-results { max-height: 200px; overflow-y: auto; border: 1px solid #eee; margin-top: 10px; }
+        .search-result-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .search-result-item:hover { background: #e9ecef; }
+        .list-items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; margin-top: 20px; }
+        .list-item { position: relative; }
+        .list-item img { width: 100%; height: auto; border-radius: 5px; }
+        .btn-remove { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">the library sale</a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Library</a>
+                <a href="lists.html" class="nav-link">Lists</a> 
+                <a href="profile.html" class="nav-link">Profile</a>
+                <a href="add-movie.html" class="add-media-btn">+ Add Media</a> 
+                <button id="authBtn" class="auth-btn">Login</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div id="listDetails">
+            <h1 id="listName">Loading...</h1>
+            <p id="listDescription"></p>
+        </div>
+
+        <div id="addMediaSection" class="add-media-section" style="display: none;">
+            <h3>Add Media to Your List</h3>
+            <div class="search-bar">
+                <input type="text" id="mediaSearchInput" placeholder="Search for media to add...">
+            </div>
+            <div id="searchResults" class="search-results"></div>
+        </div>
+
+        <div id="listItemsContainer">
+            <div id="listItemsGrid" class="list-items-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
+          authDomain: "tiny-lizard.firebaseapp.com",
+          projectId: "tiny-lizard",
+          storageBucket: "tiny-lizard.firebasestorage.app",
+          messagingSenderId: "250872474692",
+          appId: "1:250872474692:web:969e0b1302ae3cb4666011"
+        };
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore(); 
+        const auth = firebase.auth();
+
+        let currentUser = null;
+        let listId = null;
+        let listData = null;
+        let allMedia = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            listId = urlParams.get('id');
+            if (!listId) {
+                document.body.innerHTML = "<h1>Error: No List ID provided.</h1>";
+                return;
+            }
+
+            auth.onAuthStateChanged(user => {
+                currentUser = user;
+                const authBtn = document.getElementById('authBtn');
+                authBtn.textContent = user ? 'Logout' : 'Login';
+                loadInitialData();
+            });
+            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
+            document.getElementById('mediaSearchInput').addEventListener('input', handleMediaSearch);
+        });
+
+        async function handleAuthButtonClick() {
+            if (currentUser) {
+                await auth.signOut();
+            } else {
+                window.location.href = 'auth.html';
+            }
+        }
+
+        async function loadInitialData() {
+            try {
+                const listDoc = await db.collection('lists').doc(listId).get();
+                if (!listDoc.exists) throw new Error("List not found.");
+                listData = listDoc.data();
+
+                document.getElementById('listName').textContent = listData.listName;
+                document.getElementById('listDescription').textContent = listData.description;
+
+                // Show add media section only if the current user is the creator
+                if (currentUser && currentUser.uid === listData.creatorId) {
+                    document.getElementById('addMediaSection').style.display = 'block';
+                }
+
+                const mediaSnapshot = await db.collection('movies').get();
+                mediaSnapshot.forEach(doc => {
+                    allMedia[doc.id] = { id: doc.id, ...doc.data() };
+                });
+
+                renderListItems();
+            } catch (error) {
+                console.error("Error loading list:", error);
+                document.getElementById('listDetails').innerHTML = `<h1>${error.message}</h1>`;
+            }
+        }
+
+        function renderListItems() {
+            const grid = document.getElementById('listItemsGrid');
+            if (!listData.mediaIds || listData.mediaIds.length === 0) {
+                grid.innerHTML = "<p>This list is empty. Add some media using the search bar above!</p>";
+                return;
+            }
+            grid.innerHTML = listData.mediaIds.map(mediaId => {
+                const media = allMedia[mediaId];
+                if (!media) return '';
+                const canEdit = currentUser && currentUser.uid === listData.creatorId;
+                return `
+                    <div class="list-item">
+                        <a href="library.html?id=${media.id}">
+                            <img src="${media.posterUrl || ''}" alt="${media.title}" onerror="this.src='https://placehold.co/200x300?text=No+Poster'">
+                        </a>
+                        ${canEdit ? `<button class="btn-remove" onclick="removeMedia('${media.id}')">X</button>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function handleMediaSearch(e) {
+            const query = e.target.value.toLowerCase();
+            const resultsContainer = document.getElementById('searchResults');
+            if (query.length < 3) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+            const results = Object.values(allMedia).filter(m => m.title.toLowerCase().includes(query));
+            resultsContainer.innerHTML = results.slice(0, 5).map(media => `
+                <div class="search-result-item" onclick="addMedia('${media.id}')">
+                    ${media.title} (${media.year})
+                </div>
+            `).join('');
+        }
+
+        async function addMedia(mediaId) {
+            if (listData.mediaIds.includes(mediaId)) {
+                alert("This item is already in the list.");
+                return;
+            }
+            try {
+                await db.collection('lists').doc(listId).update({
+                    mediaIds: firebase.firestore.FieldValue.arrayUnion(mediaId)
+                });
+                listData.mediaIds.push(mediaId); // Update local state
+                renderListItems();
+                document.getElementById('mediaSearchInput').value = '';
+                document.getElementById('searchResults').innerHTML = '';
+            } catch (error) {
+                console.error("Error adding media:", error);
+                alert("Could not add media to the list.");
+            }
+        }
+        
+        async function removeMedia(mediaId) {
+             try {
+                await db.collection('lists').doc(listId).update({
+                    mediaIds: firebase.firestore.FieldValue.arrayRemove(mediaId)
+                });
+                listData.mediaIds = listData.mediaIds.filter(id => id !== mediaId); // Update local state
+                renderListItems();
+            } catch (error) {
+                console.error("Error removing media:", error);
+                alert("Could not remove media from the list.");
+            }
+        }
+    </script>
+</body>
+</html>

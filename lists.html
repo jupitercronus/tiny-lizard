@@ -3,88 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lists - Coming Soon</title>
+    <title>Lists - the library sale</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
     <style>
-        body {
-            background-color: #f5f5f5;
-            color: #333;
-            font-family: Arial, sans-serif;
-            margin: 0;
-        }
-        .navbar {
-            background: #333;
-            padding: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-        }
-
-        .logo {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: white;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: white;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: background-color 0.3s ease;
-        }
-
-        .nav-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .nav-link.active {
-            background: #007bff;
-        }
-        
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
+        .navbar { background: #333; padding: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+        .logo { font-size: 1.8em; font-weight: bold; color: white; text-decoration: none; }
+        .nav-links { display: flex; gap: 30px; align-items: center; }
+        .nav-link { color: white; text-decoration: none; font-weight: 500; padding: 8px 16px; border-radius: 6px; transition: background-color 0.3s ease; }
+        .nav-link:hover { background: rgba(255, 255, 255, 0.1); }
+        .nav-link.active { background: #007bff; }
         .add-media-btn { background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; transition: background-color 0.3s ease; }
         .add-media-btn:hover { background: #0056b3; }
+        .auth-btn { background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; cursor: pointer; border: none; transition: background-color 0.3s ease; }
+        .auth-btn:hover { background: #c82333; }
+        .main-container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+        .lists-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .section-title { font-size: 2em; color: #333; }
+        .btn-create { background: #28a745; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: 600; }
         
-        .auth-btn { 
-            background: #dc3545;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            transition: background-color 0.3s ease;
-        }
+        .activity-section { margin-bottom: 40px; }
+        .activity-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; }
+        .activity-item { flex-shrink: 0; width: 120px; text-align: center; }
+        .activity-item img { width: 100%; height: 180px; object-fit: cover; border-radius: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .activity-item p { font-size: 0.8em; color: #666; margin-top: 5px; }
+        .activity-item a { color: #0056b3; text-decoration: none; font-weight: bold; }
+        .activity-item a:hover { text-decoration: underline; }
 
-        .auth-btn:hover { 
-            background: #c82333;
-        }
-        .container {
+        .list-card {
+            background: white;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             display: flex;
-            justify-content: center;
-            align-items: center;
-            height: calc(100vh - 70px);
-            text-align: center;
+            overflow: hidden;
         }
-        .container h1 {
-            font-size: 3em;
-            color: #ccc;
+        .list-posters {
+            display: flex;
+            flex-shrink: 0;
         }
+        .list-posters img {
+            width: 100px;
+            height: 150px;
+            object-fit: cover;
+            border-right: 2px solid white;
+        }
+        .list-info {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .list-info h3 { margin: 0 0 10px 0; }
+        .list-info h3 a { color: #333; text-decoration: none; }
+        .list-info h3 a:hover { text-decoration: underline; }
+        .list-info p { margin: 0 0 10px 0; color: #666; font-size: 0.9em; }
+        .list-meta { font-size: 0.8em; color: #888; }
+        .list-meta a { color: #0056b3; text-decoration: none; font-weight: bold; }
+        .list-meta a:hover { text-decoration: underline; }
+        .empty-state { text-align: center; padding: 50px; }
     </style>
 </head>
 <body>
@@ -100,13 +80,31 @@
             </div>
         </div>
     </nav>
-    <div class="container">
-        <h1>Coming Soon</h1>
+
+    <div class="main-container">
+
+        <div class="activity-section">
+            <h2 class="section-title" style="text-align: left; font-size: 1.5em; margin-bottom: 15px;">Recently Watched</h2>
+            <div id="recentlyWatchedContainer" class="activity-grid"></div>
+        </div>
+        
+        <div class="activity-section">
+            <h2 class="section-title" style="text-align: left; font-size: 1.5em; margin-bottom: 15px;">Recently Acquired</h2>
+            <div id="recentlyBoughtContainer" class="activity-grid"></div>
+        </div>
+
+        <hr style="margin: 40px 0;">
+
+        <div class="lists-header">
+            <h1 class="section-title">Public Lists</h1>
+            <a href="create-list.html" class="btn-create">Create a List</a>
+        </div>
+        <div id="listsContainer">
+            <div class="empty-state"><h2>Loading lists...</h2></div>
+        </div>
     </div>
-    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+
     <script>
-        // Basic auth handling for login/logout button state
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
           authDomain: "tiny-lizard.firebaseapp.com",
@@ -116,22 +114,130 @@
           appId: "1:250872474692:web:969e0b1302ae3cb4666011"
         };
         const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore(); 
         const auth = firebase.auth();
 
         let currentUser = null;
-        auth.onAuthStateChanged(user => {
-            currentUser = user;
-            const authBtn = document.getElementById('authBtn');
-            authBtn.textContent = user ? 'Logout' : 'Login';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            auth.onAuthStateChanged(user => {
+                currentUser = user;
+                const authBtn = document.getElementById('authBtn');
+                authBtn.textContent = user ? 'Logout' : 'Login';
+                if (!user) {
+                    document.querySelector('.btn-create').href = 'auth.html';
+                }
+                loadPageData();
+            });
+            document.getElementById('authBtn').addEventListener('click', handleAuthButtonClick);
         });
 
-        document.getElementById('authBtn').addEventListener('click', () => {
-            if(currentUser) {
-                auth.signOut();
+        async function handleAuthButtonClick() {
+            if (currentUser) {
+                await auth.signOut();
             } else {
                 window.location.href = 'auth.html';
             }
-        });
+        }
+
+        function loadPageData() {
+            loadRecentlyWatched();
+            loadRecentlyBought();
+            loadPublicLists();
+        }
+
+        async function loadRecentlyWatched() {
+            const container = document.getElementById('recentlyWatchedContainer');
+            try {
+                const snapshot = await db.collection('watchHistory').orderBy('watchedDate', 'desc').limit(10).get();
+                if (snapshot.empty) {
+                    container.innerHTML = "<p>No watched activity yet.</p>";
+                    return;
+                }
+                container.innerHTML = snapshot.docs.map(doc => {
+                    const item = doc.data();
+                    return `
+                        <div class="activity-item">
+                            <a href="library.html?id=${item.mediaId}">
+                                <img src="${item.posterUrl || 'https://placehold.co/200x300?text=No+Poster'}" alt="${item.mediaTitle}">
+                            </a>
+                            <p><a href="profile.html?id=${item.userId}">${item.userDisplayName}</a> watched</p>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error("Error loading recently watched:", error);
+                container.innerHTML = "<p>Could not load activity.</p>";
+            }
+        }
+        
+        async function loadRecentlyBought() {
+            const container = document.getElementById('recentlyBoughtContainer');
+            try {
+                const snapshot = await db.collection('purchaseHistory').orderBy('timestamp', 'desc').limit(10).get();
+                if (snapshot.empty) {
+                    container.innerHTML = "<p>No new acquisitions yet.</p>";
+                    return;
+                }
+                container.innerHTML = snapshot.docs.map(doc => {
+                    const item = doc.data();
+                    return `
+                        <div class="activity-item">
+                            <a href="library.html?id=${item.mediaId}">
+                                <img src="${item.posterUrl || 'https://placehold.co/200x300?text=No+Poster'}" alt="${item.mediaTitle}">
+                            </a>
+                            <p><a href="profile.html?id=${item.userId}">${item.userDisplayName}</a> acquired</p>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error("Error loading recently bought:", error);
+                container.innerHTML = "<p>Could not load activity.</p>";
+            }
+        }
+
+        async function loadPublicLists() {
+            const container = document.getElementById('listsContainer');
+            try {
+                const listsSnapshot = await db.collection('lists').where('isPublic', '==', true).orderBy('createdAt', 'desc').get();
+                if (listsSnapshot.empty) {
+                    container.innerHTML = '<div class="empty-state"><h3>No public lists yet.</h3><p>Why not create the first one?</p></div>';
+                    return;
+                }
+
+                const allMediaSnapshot = await db.collection('movies').get();
+                const allMedia = {};
+                allMediaSnapshot.forEach(doc => {
+                    allMedia[doc.id] = doc.data();
+                });
+
+                let listsHTML = '';
+                listsSnapshot.forEach(doc => {
+                    const list = doc.data();
+                    const listId = doc.id;
+                    const postersHTML = (list.mediaIds || []).slice(0, 5).map(mediaId => {
+                        const media = allMedia[mediaId];
+                        return media && media.posterUrl ? `<img src="${media.posterUrl}" alt="">` : '';
+                    }).join('');
+
+                    listsHTML += `
+                        <div class="list-card">
+                            <div class="list-posters">${postersHTML}</div>
+                            <div class="list-info">
+                                <h3><a href="edit-list.html?id=${listId}">${list.listName}</a></h3>
+                                <p class="list-meta">Created by <a href="profile.html?id=${list.creatorId}">${list.creatorDisplayName || 'Anonymous'}</a></p>
+                                <p>${list.description || ''}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = listsHTML;
+
+            } catch (error) {
+                console.error("Error loading public lists:", error);
+                container.innerHTML = '<div class="empty-state"><h3>Could not load lists. Please try again later.</h3></div>';
+            }
+        }
     </script>
 </body>
 </html>

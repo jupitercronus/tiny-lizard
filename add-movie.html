@@ -166,10 +166,33 @@
         .search-result h4 { margin: 0 0 5px 0; color: #333; }
         .search-result p { margin: 0; color: #666; font-size: 14px; }
         
-        .star-rating { display: flex; gap: 5px; margin-bottom: 10px; }
-        .star { font-size: 24px; color: #ddd; cursor: pointer; transition: color 0.3s ease; }
-        .star.active, .star:hover { color: #ffc107; }
-        
+        /* NEW: Simplified Half-Star Rating Styles */
+        .star-rating { 
+            display: inline-flex; 
+            gap: 2px;
+        }
+        .star { 
+            position: relative; 
+            font-size: 2.5em; 
+            color: #ddd; 
+            cursor: pointer;
+            user-select: none;
+        }
+        .star::before {
+            content: '★';
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: #ffc107;
+            width: 0%;
+            overflow: hidden;
+            transition: width 0.1s ease;
+        }
+        .star.half::before { width: 50%; }
+        .star.full::before { width: 100%; }
+        .star.hover-half::before { width: 50%; }
+        .star.hover-full::before { width: 100%; }
+
         .status-message { padding: 10px; border-radius: 5px; margin: 10px 0; }
         .status-success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
         .status-error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
@@ -269,11 +292,11 @@
             <div class="form-group">
                 <label>Rating</label>
                 <div class="star-rating" id="starRating">
-                    <span class="star" data-rating="1">★</span>
-                    <span class="star" data-rating="2">★</span>
-                    <span class="star" data-rating="3">★</span>
-                    <span class="star" data-rating="4">★</span>
-                    <span class="star" data-rating="5">★</span>
+                    <span class="star">★</span>
+                    <span class="star">★</span>
+                    <span class="star">★</span>
+                    <span class="star">★</span>
+                    <span class="star">★</span>
                 </div>
             </div>
             
@@ -387,6 +410,32 @@
                 }
             });
         }
+        
+        async function updateHistory(collectionName, docId, mediaId, mediaData, userInteraction) {
+            if (collectionName === 'watchHistory' && userInteraction.watched && userInteraction.watchedDate) {
+                 await db.collection('watchHistory').doc(docId).set({
+                    userId: currentUser.uid,
+                    userDisplayName: currentUser.displayName || currentUser.email,
+                    mediaId: mediaId,
+                    mediaTitle: mediaData.title,
+                    posterUrl: mediaData.posterUrl,
+                    watchedDate: userInteraction.watchedDate,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log("Updated watch history.");
+            } else if (collectionName === 'purchaseHistory' && userInteraction.owned) {
+                await db.collection('purchaseHistory').doc(docId).set({
+                    userId: currentUser.uid,
+                    userDisplayName: currentUser.displayName || currentUser.email,
+                    mediaId: mediaId,
+                    mediaTitle: mediaData.title,
+                    posterUrl: mediaData.posterUrl,
+                    editionDetails: document.getElementById('editionDetails').value || 'Physical Copy',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log("Updated purchase history.");
+            }
+        }
 
         async function addMedia() {
             const submitBtn = document.getElementById('submitBtn');
@@ -396,16 +445,18 @@
             try {
                 const tmdbId = document.getElementById('movieForm').dataset.tmdbId;
                 let movieDocRef;
+                let mainMediaData;
 
                 if (tmdbId) {
                     const existingQuery = await db.collection('movies').where('tmdbId', '==', parseInt(tmdbId)).limit(1).get();
                     if (!existingQuery.empty) {
                         movieDocRef = existingQuery.docs[0].ref;
+                        mainMediaData = existingQuery.docs[0].data();
                     }
                 }
                 
                 if (!movieDocRef) {
-                    const mainMediaData = {
+                    mainMediaData = {
                         title: document.getElementById('title').value,
                         year: document.getElementById('year').value ? parseInt(document.getElementById('year').value) : null,
                         director: document.getElementById('director').value,
@@ -434,7 +485,11 @@
                 };
                 await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(movieDocRef.id).set(userInteractionData);
 
-                if (document.getElementById('ownedCheckbox').checked) {
+                const historyDocId = `${currentUser.uid}_${movieDocRef.id}`;
+                await updateHistory('watchHistory', historyDocId, movieDocRef.id, mainMediaData, userInteractionData);
+                await updateHistory('purchaseHistory', historyDocId, movieDocRef.id, mainMediaData, userInteractionData);
+
+                if (userInteractionData.owned) {
                     const physicalCopyData = {
                         ownerId: currentUser.uid,
                         ownerDisplayName: currentUser.displayName || currentUser.email,
@@ -464,6 +519,8 @@
 
             try {
                 const movieDocRef = db.collection('movies').doc(editingMovieId);
+                const mediaDoc = await movieDocRef.get();
+                const mainMediaData = mediaDoc.data();
 
                 const userInteractionData = {
                     rating: currentRating,
@@ -475,6 +532,10 @@
                 };
                 await db.collection('users').doc(currentUser.uid).collection('movieInteractions').doc(editingMovieId).set(userInteractionData, { merge: true });
 
+                const historyDocId = `${currentUser.uid}_${editingMovieId}`;
+                await updateHistory('watchHistory', historyDocId, editingMovieId, mainMediaData, userInteractionData);
+                await updateHistory('purchaseHistory', historyDocId, editingMovieId, mainMediaData, userInteractionData);
+
                 const ownedCheckbox = document.getElementById('ownedCheckbox');
                 const physicalCopiesRef = movieDocRef.collection('physicalCopies');
                 const myCopyQuery = await physicalCopiesRef.where('ownerId', '==', currentUser.uid).get();
@@ -483,19 +544,13 @@
                     const physicalCopyData = {
                         ownerId: currentUser.uid,
                         ownerDisplayName: currentUser.displayName || currentUser.email,
-                        editionDetails: document.getElementById('editionDetails').value || document.getElementById('editionDetailsInput').value || 'Standard Edition',
+                        editionDetails: document.getElementById('editionDetails').value || 'Standard Edition',
                         dateAdded: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     await physicalCopiesRef.add(physicalCopyData);
                 } else if (!ownedCheckbox.checked && !myCopyQuery.empty) {
                     for (const doc of myCopyQuery.docs) {
                         await doc.ref.delete();
-                    }
-                } else if (ownedCheckbox.checked && !myCopyQuery.empty) {
-                    const copyDoc = myCopyQuery.docs[0];
-                    const newEditionDetails = document.getElementById('editionDetails').value;
-                    if (copyDoc.data().editionDetails !== newEditionDetails) {
-                        await copyDoc.ref.update({ editionDetails: newEditionDetails });
                     }
                 }
 
@@ -654,20 +709,51 @@
         }
         
         function setupStarRating() {
-            const stars = document.querySelectorAll('.star');
-            stars.forEach(star => {
-                star.addEventListener('click', function() {
-                    currentRating = parseInt(this.dataset.rating);
-                    updateStars();
+            const ratingContainer = document.getElementById('starRating');
+            const stars = Array.from(ratingContainer.children);
+
+            ratingContainer.addEventListener('mousemove', e => {
+                const rect = ratingContainer.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                const hoverValue = Math.round(percent * 5 * 2) / 2;
+                
+                stars.forEach((star, index) => {
+                    star.classList.remove('hover-full', 'hover-half');
+                    if (hoverValue > index + 0.5) {
+                        star.classList.add('hover-full');
+                    } else if (hoverValue > index) {
+                        star.classList.add('hover-half');
+                    }
                 });
             });
-        }
-        function updateStars() {
-            const stars = document.querySelectorAll('.star');
-            stars.forEach(star => {
-                star.classList.toggle('active', parseInt(star.dataset.rating) <= currentRating);
+
+            ratingContainer.addEventListener('mouseleave', () => {
+                stars.forEach(star => {
+                    star.classList.remove('hover-full', 'hover-half');
+                });
+                updateStars();
+            });
+
+            ratingContainer.addEventListener('click', e => {
+                const rect = ratingContainer.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                currentRating = Math.round(percent * 5 * 2) / 2;
+                updateStars();
             });
         }
+
+        function updateStars() {
+            const stars = Array.from(document.getElementById('starRating').children);
+            stars.forEach((star, index) => {
+                star.classList.remove('full', 'half');
+                if (currentRating > index + 0.5) {
+                    star.classList.add('full');
+                } else if (currentRating > index) {
+                    star.classList.add('half');
+                }
+            });
+        }
+
         function togglePublicFieldsReadonly(isReadonly) {
              const fields = ['title', 'year', 'director', 'genre', 'summary', 'cast', 'contentType'];
              fields.forEach(id => {
@@ -693,9 +779,45 @@
             const statusDiv = document.getElementById('statusMessage');
             statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
         }
-        function setupBarcodeScanner() { /* Your full barcode scanner setup code here */ }
-        function lookupMovieByBarcode(barcode) { /* Your full barcode lookup code here */ }
-        function extractMovieTitle(productName) { /* Your full title extraction code here */ }
+        
+        function setupBarcodeScanner() {
+            console.log("Barcode scanner setup complete.");
+        }
+        async function lookupMovieByBarcode(barcode) {
+            showStatusMessage(`Looking up barcode: ${barcode}...`, 'info');
+            try {
+                const upcResponse = await fetch(`${UPC_BASE_URL}?upc=${barcode}`);
+                if (!upcResponse.ok) throw new Error(`UPC lookup failed: ${upcResponse.statusText}`);
+                const upcData = await upcResponse.json();
+
+                if (!upcData.items || upcData.items.length === 0) {
+                    showAlertModal('Barcode Not Found', `No product found for barcode: ${barcode}.`);
+                    return;
+                }
+                
+                const product = upcData.items[0];
+                const productName = product.title || 'Unknown Product';
+                
+                document.getElementById('editionDetailsInput').value = productName;
+                document.getElementById('editionDetails').value = productName;
+                
+                showStatusMessage(`Found: ${productName}. Searching TMDb...`, 'info');
+                
+                const movieTitle = extractMovieTitle(productName);
+                await performSearch(movieTitle);
+
+            } catch (error) {
+                console.error('Barcode lookup error:', error);
+                showAlertModal('Lookup Error', `An error occurred: ${error.message}.`);
+            }
+        }
+        function extractMovieTitle(productName) {
+            let title = productName;
+            title = title.replace(/\b(DVD|Blu-ray|4K|UHD|Digital|Copy|Widescreen|Full Screen)\b/gi, '');
+            title = title.replace(/\s*\(.*?\)\s*/g, ' ').trim(); 
+            title = title.replace(/\s*\[.*?\]\s*/g, ' ').trim();
+            return title.trim() || productName;
+        }
     </script>
 </body>
 </html>

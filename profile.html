@@ -258,15 +258,15 @@
 
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-number" id="totalContentCount">0</div>
-                        <div class="stat-label">Total in Collection</div>
+                        <div class="stat-number" id="totalMediaCount">0</div>
+                        <div class="stat-label">Total Media in Collection</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="watchedContentCount">0</div>
+                        <div class="stat-number" id="watchedMediaCount">0</div>
                         <div class="stat-label">Watched</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="ownedContentCount">0</div>
+                        <div class="stat-number" id="ownedMediaCount">0</div>
                         <div class="stat-label">Owned Physical Copies</div>
                     </div>
                     <div class="stat-card">
@@ -280,24 +280,23 @@
                 </div>
             </div>
 
-            <h2 class="section-title">My Watched Content</h2>
+            <h2 class="section-title">Watched Media</h2>
             <div class="media-list-section">
-                <div id="watchedContentList" class="media-list-grid">
-                    <div class="empty-list">Loading watched content...</div>
+                <div id="watchedMediaList" class="media-list-grid">
+                    <div class="empty-list">Loading watched media...</div>
                 </div>
             </div>
 
-            <h2 class="section-title">My Owned Content</h2>
+            <h2 class="section-title">Owned Media</h2>
             <div class="media-list-section">
-                <div id="ownedContentList" class="media-list-grid">
-                    <div class="empty-list">Loading owned content...</div>
+                <div id="ownedMediaList" class="media-list-grid">
+                    <div class="empty-list">Loading owned media...</div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- Firebase Initialization ---
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
           authDomain: "tiny-lizard.firebaseapp.com",
@@ -309,19 +308,26 @@
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore(); 
         const auth = firebase.auth(); 
-        // --- End Firebase Initialization ---
 
         let currentUser = null;
 
         document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const profileUserId = urlParams.get('id');
+
             auth.onAuthStateChanged(user => {
+                currentUser = user;
                 const authBtn = document.getElementById('authBtn');
-                if (user) {
-                    currentUser = user;
-                    authBtn.textContent = 'Logout';
-                    loadProfileData();
+                authBtn.textContent = user ? 'Logout' : 'Login';
+
+                if (profileUserId) {
+                    // If a user ID is in the URL, load that user's profile.
+                    loadProfileData(profileUserId);
+                } else if (currentUser) {
+                    // If no ID in URL, but user is logged in, load their own profile.
+                    loadProfileData(currentUser.uid);
                 } else {
-                    authBtn.textContent = 'Login';
+                    // If no ID and not logged in, redirect to login.
                     window.location.href = 'auth.html';
                 }
             });
@@ -337,49 +343,45 @@
             }
         }
 
-        async function loadProfileData() {
-            if (!currentUser) return;
-
-            // Display user info immediately
-            document.getElementById('profileDisplayName').textContent = currentUser.displayName || 'User';
-            document.getElementById('profileEmail').textContent = currentUser.email;
-
+        async function loadProfileData(userId) {
             try {
-                // Fetch all of the user's interactions
-                const interactionsSnapshot = await db.collection('users').doc(currentUser.uid).collection('movieInteractions').get();
+                // Fetch the profile user's public info
+                const userDoc = await db.collection('users').doc(userId).get();
+                if (!userDoc.exists) {
+                    document.getElementById('profileContainer').innerHTML = '<h2>User profile not found.</h2>';
+                    return;
+                }
+                const profileData = userDoc.data();
+                document.getElementById('profileDisplayName').textContent = profileData.displayName || 'User';
+                document.getElementById('profileEmail').textContent = profileData.email;
+
+                // Fetch this user's interactions
+                const interactionsSnapshot = await db.collection('users').doc(userId).collection('movieInteractions').get();
                 const interactions = interactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
                 if (interactions.length === 0) {
-                    // Handle case where user has no interactions yet
                     calculateAndDisplayStats([]);
-                    displayWatchedContent([]);
-                    displayOwnedContent([]);
+                    displayWatchedMedia([]);
+                    displayOwnedMedia([]);
                     return;
                 }
 
-                // Get the list of all media IDs from the interactions
                 const mediaIds = interactions.map(i => i.id);
                 
-                // Fetch all the corresponding main media documents
                 const mediaSnapshot = await db.collection('movies').where(firebase.firestore.FieldPath.documentId(), 'in', mediaIds).get();
                 const allMoviesData = {};
                 mediaSnapshot.forEach(doc => {
                     allMoviesData[doc.id] = doc.data();
                 });
 
-                // Combine interaction data with main media data
                 const fullMediaDetails = interactions.map(interaction => {
                     const mediaData = allMoviesData[interaction.id];
-                    return {
-                        ...interaction, // myRating, myWatched, etc.
-                        ...mediaData   // title, posterUrl, etc.
-                    };
+                    return { ...interaction, ...mediaData };
                 });
 
-                // Now we can calculate stats and render the lists
                 calculateAndDisplayStats(fullMediaDetails);
-                displayWatchedContent(fullMediaDetails.filter(m => m.watched));
-                displayOwnedContent(fullMediaDetails.filter(m => m.owned));
+                displayWatchedMedia(fullMediaDetails.filter(m => m.watched));
+                displayOwnedMedia(fullMediaDetails.filter(m => m.owned));
 
             } catch (error) {
                 console.error("Error loading profile data:", error);
@@ -388,51 +390,41 @@
         }
 
         function calculateAndDisplayStats(mediaItems) {
-            const totalContent = mediaItems.length;
-            const watchedContent = mediaItems.filter(item => item.watched).length;
-            const ownedContent = mediaItems.filter(item => item.owned).length;
+            document.getElementById('totalMediaCount').textContent = mediaItems.length;
+            document.getElementById('watchedMediaCount').textContent = mediaItems.filter(item => item.watched).length;
+            document.getElementById('ownedMediaCount').textContent = mediaItems.filter(item => item.owned).length;
             
             const ratedItems = mediaItems.filter(item => item.rating > 0);
             const avgRating = ratedItems.length > 0
                 ? (ratedItems.reduce((sum, item) => sum + item.rating, 0) / ratedItems.length).toFixed(1)
                 : '0.0';
+            document.getElementById('avgRating').textContent = avgRating;
             
             const totalHours = Math.round(
                 mediaItems
                     .filter(item => item.watched && item.runtime)
                     .reduce((sum, item) => sum + parseInt(item.runtime), 0) / 60
             );
-
-            document.getElementById('totalContentCount').textContent = totalContent;
-            document.getElementById('watchedContentCount').textContent = watchedContent;
-            document.getElementById('ownedContentCount').textContent = ownedContent;
-            document.getElementById('avgRating').textContent = avgRating;
             document.getElementById('totalHours').textContent = totalHours;
         }
 
-        function displayWatchedContent(watchedItems) {
-            const container = document.getElementById('watchedContentList');
+        function displayWatchedMedia(watchedItems) {
+            const container = document.getElementById('watchedMediaList');
             if (watchedItems.length === 0) {
-                container.innerHTML = '<div class="empty-list">No watched content yet.</div>';
+                container.innerHTML = '<div class="empty-list">No watched media yet.</div>';
                 return;
             }
-
-            // Sort by watched date, newest first
             watchedItems.sort((a, b) => new Date(b.watchedDate) - new Date(a.watchedDate));
-
             container.innerHTML = watchedItems.map(item => renderMediaItem(item)).join('');
         }
 
-        function displayOwnedContent(ownedItems) {
-            const container = document.getElementById('ownedContentList');
+        function displayOwnedMedia(ownedItems) {
+            const container = document.getElementById('ownedMediaList');
             if (ownedItems.length === 0) {
-                container.innerHTML = '<div class="empty-list">No owned content yet.</div>';
+                container.innerHTML = '<div class="empty-list">No owned media yet.</div>';
                 return;
             }
-            
-            // Sort alphabetically
             ownedItems.sort((a,b) => (a.title || '').localeCompare(b.title || ''));
-
             container.innerHTML = ownedItems.map(item => renderMediaItem(item)).join('');
         }
         

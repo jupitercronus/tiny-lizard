@@ -126,21 +126,26 @@
             color: #333;
             margin: 0 0 10px 0;
         }
+        
+        .media-actions {
+            margin-top: 20px;
+        }
+        
+        .btn-action {
+            padding: 8px 16px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn-add-list {
+            background: #17a2b8;
+            color: white;
+        }
 
-        .media-tagline {
-            font-style: italic;
-            color: #666;
-            margin-bottom: 20px;
-        }
-        
-        .media-details p {
-            margin: 0 0 8px 0;
-            color: #444;
-        }
-        .media-details strong {
-            color: #000;
-        }
-        
         .media-summary {
             margin-top: 20px;
             line-height: 1.6;
@@ -159,7 +164,6 @@
             margin-bottom: 20px;
         }
 
-        /* My Interaction Section */
         .my-interaction-section {
             background: #f8f9fa;
             padding: 20px;
@@ -184,19 +188,11 @@
         .btn-edit {
             background: #007bff;
             color: white;
-            padding: 8px 16px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: background-color 0.3s ease;
-            border: none;
-            cursor: pointer;
         }
         .btn-edit:hover {
             background: #0056b3;
         }
 
-        /* Physical Copies Section */
         .physical-copies-list {
             list-style: none;
             padding: 0;
@@ -207,16 +203,15 @@
             padding: 15px;
             border-radius: 6px;
             margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
-        .copy-details {
+        
+        .copy-owner a {
+            color: #0056b3;
+            text-decoration: none;
             font-weight: bold;
         }
-        .copy-owner {
-            color: #555;
-            font-size: 0.9em;
+        .copy-owner a:hover {
+            text-decoration: underline;
         }
         
         .loading-state, .error-state {
@@ -225,21 +220,15 @@
             color: #666;
             padding: 50px 0;
         }
-
-        @media (max-width: 768px) {
-            .media-layout {
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-            }
-            .media-poster {
-                width: 80%;
-                max-width: 250px;
-            }
-            .media-title {
-                font-size: 2.2em;
-            }
-        }
+        
+        /* Add to List Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fefefe; margin: auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2); }
+        .modal-content h3 { margin-top: 0; }
+        #myListsContainer { max-height: 200px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; }
+        .list-choice { display: block; margin-bottom: 10px; }
+        .modal-actions { text-align: right; }
+        .btn-close { background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -257,28 +246,38 @@
     </nav>
 
     <div class="main-container" id="mainContainer">
-        <!-- Content will be dynamically loaded here -->
         <div class="loading-state">
             <h2>Loading Media Details...</h2>
         </div>
     </div>
+    
+    <!-- Add to List Modal -->
+    <div id="addToListModal" class="modal">
+        <div class="modal-content">
+            <h3>Add to your lists</h3>
+            <div id="myListsContainer">
+                <!-- User's lists will be loaded here -->
+            </div>
+            <div class="modal-actions">
+                <a href="create-list.html" style="float: left;">Create a new list</a>
+                <button class="btn-close" onclick="closeAddToListModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
-        // --- Firebase Initialization ---
         const firebaseConfig = {
           apiKey: "AIzaSyDDW8LtwpYevdkD7Q-_CxJ23mMfi00P21M",
           authDomain: "tiny-lizard.firebaseapp.com",
           projectId: "tiny-lizard",
           storageBucket: "tiny-lizard.firebasestorage.app",
           messagingSenderId: "250872474692",
-          appId: "1:250872474692:web:969e0b1302ae3cb4666011",
-          measurementId: "G-43FM6WR90B"
+          appId: "1:250872474692:web:969e0b1302ae3cb4666011"
         };
-
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore(); 
-        const auth = firebase.auth(); 
-        // --- End Firebase Initialization ---
+        const auth = firebase.auth();
 
         let currentUser = null;
         let mediaId = null;
@@ -286,20 +285,15 @@
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             mediaId = urlParams.get('id');
-
             if (!mediaId) {
-                displayError("No media ID provided in the URL.");
+                displayError("No media ID provided.");
                 return;
             }
 
             auth.onAuthStateChanged(user => {
                 currentUser = user;
                 const authBtn = document.getElementById('authBtn');
-                if (user) {
-                    authBtn.textContent = 'Logout';
-                } else {
-                    authBtn.textContent = 'Login';
-                }
+                authBtn.textContent = user ? 'Logout' : 'Login';
                 loadMediaData();
             });
             
@@ -309,7 +303,7 @@
         async function handleAuthButtonClick() {
             if (currentUser) {
                 await auth.signOut();
-                window.location.reload(); // Reload to reflect logged-out state
+                window.location.reload();
             } else {
                 window.location.href = 'auth.html';
             }
@@ -317,7 +311,6 @@
 
         async function loadMediaData() {
             try {
-                // --- Fetch all data in parallel for efficiency ---
                 const [mediaDoc, physicalCopiesSnapshot, interactionDoc] = await Promise.all([
                     db.collection('movies').doc(mediaId).get(),
                     db.collection('movies').doc(mediaId).collection('physicalCopies').get(),
@@ -359,7 +352,7 @@
                             <p><strong>Status:</strong> ${myInteraction.watched ? 'Watched' : 'Not Watched'}</p>
                             ${myInteraction.watchedDate ? `<p><strong>Watched Date:</strong> ${myInteraction.watchedDate}</p>` : ''}
                             <p><strong>My Notes:</strong> ${myInteraction.review || '<em>No notes added.</em>'}</p>
-                            <button class="btn-edit" onclick="editMyInteraction()">Edit My Details</button>
+                            <button class="btn-action btn-edit" onclick="editMyInteraction()">Edit My Details</button>
                         </div>
                     `;
                 } else {
@@ -367,7 +360,7 @@
                         <div class="my-interaction-section">
                             <h3 class="section-title">Add to Your Collection</h3>
                             <p>You haven't added this media to your personal collection yet.</p>
-                            <button class="btn-edit" onclick="editMyInteraction()">Add Rating & Notes</button>
+                            <button class="btn-action btn-edit" onclick="editMyInteraction()">Add Rating & Notes</button>
                         </div>
                     `;
                 }
@@ -377,22 +370,14 @@
             if (physicalCopies.length > 0) {
                 const listItems = physicalCopies.map(copy => `
                     <li class="physical-copy-item">
-                        <span class="copy-details">${copy.editionDetails || 'Standard Edition'}</span>
-                        <span class="copy-owner">Owned by: ${copy.ownerDisplayName || 'Unknown'}</span>
+                        <strong>${copy.editionDetails || 'Standard Edition'}</strong>
+                        <span class="copy-owner">Owned by: <a href="profile.html?id=${copy.ownerId}">${copy.ownerDisplayName || 'Unknown'}</a></span>
                     </li>
                 `).join('');
-
                 physicalCopiesHTML = `
                     <div>
                         <h3 class="section-title">Physical Copies (${physicalCopies.length} total)</h3>
                         <ul class="physical-copies-list">${listItems}</ul>
-                    </div>
-                `;
-            } else {
-                 physicalCopiesHTML = `
-                    <div>
-                        <h3 class="section-title">Physical Copies</h3>
-                        <p>There are no physical copies of this media registered in the library yet.</p>
                     </div>
                 `;
             }
@@ -404,29 +389,73 @@
                     </div>
                     <div class="media-info">
                         <h1 class="media-title">${title}</h1>
-                        ${mediaData.tagline ? `<p class="media-tagline">${mediaData.tagline}</p>` : ''}
-                        
-                        <div class="media-details">
-                            <p><strong>Year:</strong> ${mediaData.year || 'N/A'}</p>
-                            <p><strong>Director:</strong> ${mediaData.director || 'N/A'}</p>
-                            <p><strong>Genre:</strong> ${mediaData.genre || 'N/A'}</p>
-                            <p><strong>Runtime:</strong> ${mediaData.runtime ? `${mediaData.runtime} min` : 'N/A'}</p>
+                        <div class="media-actions">
+                            <button class="btn-action btn-add-list" onclick="openAddToListModal()">Add to a List...</button>
                         </div>
-
                         <div class="media-summary">
                             <p>${mediaData.overview || 'No summary available.'}</p>
                         </div>
                     </div>
                 </div>
-                
                 <hr class="section-divider">
-                
                 ${myInteractionHTML}
-                
                 <hr class="section-divider">
-
                 ${physicalCopiesHTML}
             `;
+        }
+        
+        async function openAddToListModal() {
+            if (!currentUser) {
+                alert("Please log in to add this to a list.");
+                return;
+            }
+            const modal = document.getElementById('addToListModal');
+            const container = document.getElementById('myListsContainer');
+            container.innerHTML = "<p>Loading your lists...</p>";
+            modal.style.display = 'flex';
+
+            try {
+                const listsSnapshot = await db.collection('lists').where('creatorId', '==', currentUser.uid).get();
+                if (listsSnapshot.empty) {
+                    container.innerHTML = "<p>You haven't created any lists yet.</p>";
+                    return;
+                }
+
+                container.innerHTML = listsSnapshot.docs.map(doc => {
+                    const list = doc.data();
+                    const listId = doc.id;
+                    const alreadyAdded = (list.mediaIds || []).includes(mediaId);
+                    return `
+                        <div class="list-choice">
+                            <button onclick="toggleMediaInList('${listId}', ${alreadyAdded})" ${alreadyAdded ? 'style="background: #28a745; color: white;"' : ''}>
+                                ${alreadyAdded ? '✓ Added' : 'Add'}
+                            </button>
+                            <span>${list.listName}</span>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error("Error fetching user's lists:", error);
+                container.innerHTML = "<p>Could not load your lists.</p>";
+            }
+        }
+
+        function closeAddToListModal() {
+            document.getElementById('addToListModal').style.display = 'none';
+        }
+
+        async function toggleMediaInList(listId, alreadyAdded) {
+            const operation = alreadyAdded 
+                ? firebase.firestore.FieldValue.arrayRemove(mediaId) 
+                : firebase.firestore.FieldValue.arrayUnion(mediaId);
+            
+            try {
+                await db.collection('lists').doc(listId).update({ mediaIds: operation });
+                openAddToListModal(); 
+            } catch (error) {
+                console.error("Error updating list:", error);
+                alert("Could not update the list. Please try again.");
+            }
         }
         
         function generateStarDisplay(rating) {
@@ -441,19 +470,12 @@
         function editMyInteraction() {
             if (currentUser) {
                 window.location.href = `add-movie.html?edit=${mediaId}`;
-            } else {
-                alert("Please log in to edit your details.");
             }
         }
 
         function displayError(message) {
             const container = document.getElementById('mainContainer');
-            container.innerHTML = `
-                <div class="error-state">
-                    <h2>Error</h2>
-                    <p>${message}</p>
-                </div>
-            `;
+            container.innerHTML = `<div class="error-state"><h2>Error</h2><p>${message}</p></div>`;
         }
     </script>
 </body>
